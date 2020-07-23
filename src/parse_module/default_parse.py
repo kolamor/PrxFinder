@@ -1,6 +1,6 @@
 import re
 import logging
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
 from aiohttp import ClientSession
 
 logger = logging.getLogger(__name__)
@@ -9,6 +9,7 @@ __all__ = ('request_get', 'DefaultParse')
 
 
 async def request_get(session: ClientSession, url: str, proxy: Optional[str] = None) -> Union[str, None]:
+    """"""
     async with session.get(url=url, proxy=proxy) as response:
         if response.status == 200:
             text = await response.text()
@@ -18,6 +19,7 @@ async def request_get(session: ClientSession, url: str, proxy: Optional[str] = N
 
 
 class DefaultParse:
+    """ """
 
     def __init__(self, session: ClientSession, proxy: Optional[str]):
         self._session = session
@@ -31,3 +33,6 @@ class DefaultParse:
             logger.exception(e)
             text = None
         return text
+
+    def parse_text_to_proxy(self, text: str) -> Union[Tuple[str, ...], None]:
+        pass
