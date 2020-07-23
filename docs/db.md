@@ -8,8 +8,8 @@
     <li>password - varchar (open view?)</li>
     <li>location - referer Location</li>
     <li>checked_at - datetime</li>
-    <li>protocol - (http, https, socks4, socks5)</li>
-    <li>timeout - int</li>
+    <li>schema(protocol)- (http, https, socks4, socks5)</li>
+    <li>latency - int</li>
     <li>is alive - boolean</li>
     <li>anonymous - ?</li>
 </ol>
