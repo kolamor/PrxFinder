@@ -12,6 +12,7 @@ from sqlalchemy.ext.compiler import compiles
 __all__ = ('proxy', 'location')
 
 meta = MetaData()
+
 # Model table Proxy
 proxy = Table(
     'proxy', meta,
