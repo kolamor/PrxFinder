@@ -1,8 +1,10 @@
+import aiohttp
 import pytest
 from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
 from src.parse_module.utils import IPPortPatternLine
+from src import ProxyClient, Proxy
 
 @pytest.mark.asyncio
 async def test_create_tcp_connector():
@@ -44,4 +46,29 @@ def test_parse_ip(template):
 
     for r in res:
         assert r in pars
+
+
+
+proxy_list = ['socks5://138.197.2.106:56658', 'http://login:passs@37.45.89.1:4890']
+
+class TestProxy:
+
+    @pytest.mark.parametrize('proxy', proxy_list)
+    def test_create_from_url(self, proxy):
+        prx = Proxy.create_from_url(proxy)
+        assert prx.url == proxy
+
+
+class TestClient:
+
+    @pytest.mark.parametrize('proxy', proxy_list )
+    @pytest.mark.client
+    @pytest.mark.asyncio
+    async def test_proxy_client(self, proxy):
+        proxy = Proxy.create_from_url(proxy)
+        async with ProxyClient(proxy=proxy) as sess:
+            assert isinstance(sess._session, aiohttp.ClientSession)
+            assert sess.closed is False
+        assert sess._session.closed is True
+
 
