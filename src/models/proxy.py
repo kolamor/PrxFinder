@@ -1,6 +1,11 @@
 import asyncio
 import datetime
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+__all__ = ('Location', 'Proxy', 'ProxyChecker')
 
 
 class Location:
@@ -19,7 +24,7 @@ class Proxy:
                  location: Optional[Location] = None,
                  schema: str = 'http',
                  is_alive: Optional[bool] = None,
-                 latency: Optional[float] = None,
+                 latency: Optional[int] = None,
                  checked_at: Optional[datetime.datetime] = None
                  ):
         self.host = host
@@ -32,7 +37,7 @@ class Proxy:
         self.latency = latency
         self.checked_at = checked_at
 
-    def create_uri(self):
+    def _create_uri(self):
         host_port = f'{self.host}:{self.port}'
         if self.user and self.password:
             uri = f'{self.schema}://{self.user}:{self.password}@{host_port}'
@@ -40,5 +45,23 @@ class Proxy:
             uri = f'{self.schema}://{host_port}'
         return uri
 
+    @property
+    def url(self):
+        return self._create_uri()
+
     def __str__(self):
-        return self.create_uri
+        return self._create_uri()
+
+
+class ProxyChecker:
+    """Check proxy"""
+    def __init__(self, proxy):
+        self._proxy = proxy
+
+    @classmethod
+    async def check(cls, proxy: Proxy) -> 'ProxyChecker':
+        self = cls(proxy=proxy)
+        return self
+
+    async def __check(self):
+        pass
