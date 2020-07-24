@@ -1,7 +1,11 @@
 import asyncio
 import datetime
-from typing import Optional
 import logging
+try:
+    from urllib2 import _parse_proxy
+except ImportError:
+    from urllib.request import _parse_proxy
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +48,23 @@ class Proxy:
         else:
             uri = f'{self.schema}://{host_port}'
         return uri
+
+    @classmethod
+    def create_from_url(cls, url: str) -> 'Proxy':
+        proxy_type, user, password, hostport = _parse_proxy(url)
+
+        if ':' in hostport:
+            host, port = hostport.split(':')
+            kw = {'host': host, "port": port}
+        else:
+            kw = {'host': hostport}
+
+        self = cls(schema=proxy_type,
+                   user=user,
+                   password=password,
+                   **kw)
+        return self
+
 
     @property
     def url(self):
