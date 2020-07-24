@@ -12,21 +12,23 @@ from sqlalchemy.ext.compiler import compiles
 __all__ = ('proxy', 'location')
 
 meta = MetaData()
+# Model table Proxy
 proxy = Table(
     'proxy', meta,
     Column('host', VARCHAR),
     Column('port', Integer),
-    Column('user', VARCHAR, nullable=True),
+    Column('user_', VARCHAR, nullable=True),
     Column('password', VARCHAR, nullable=True),
-    Column('checked_at', DateTime(timezone=False), server_default=func.now()),
-    Column('schema', VARCHAR(6)),
-    Column('location', VARCHAR, ForeignKey('location.code', ondelete='SET NULL'), ),
-    Column('latency', REAL, nullable=True),
+    Column('date_creation', DateTime(timezone=False)),
+    Column('protocol', VARCHAR(6)),
+    Column('location_code', VARCHAR, ForeignKey('location.code', ondelete='SET NULL'), ),
+    Column('latency', Integer, nullable=True),
     Column('is_alive', BOOLEAN, nullable=True),
     Column('anonymous', BOOLEAN, nullable=True),
     UniqueConstraint('host', 'port', name='unique_host_port'),
 )
 
+# Model table location, use from proxy sort
 location = Table(
     'location', meta,
     Column('city', VARCHAR),
