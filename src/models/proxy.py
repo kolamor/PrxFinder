@@ -59,12 +59,8 @@ class Proxy:
         else:
             kw = {'host': hostport}
 
-        self = cls(schema=proxy_type,
-                   user=user,
-                   password=password,
-                   **kw)
+        self = cls(schema=proxy_type, user=user, password=password, **kw)
         return self
-
 
     @property
     def url(self):
