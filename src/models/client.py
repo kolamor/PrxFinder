@@ -6,6 +6,7 @@ from  types import TracebackType
 from typing import Optional, Type
 import logging
 from .proxy import Proxy
+from multidict import CIMultiDictProxy
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ __all__ = ('ProxyClient', )
 
 
 class ProxyClient:
-    test_url = 'httpbin.org/status/200'
+    test_url = 'http://httpbin.org/status/200'
 
     def __init__(self, proxy: Proxy, test_url: str = None):
         self.proxy = proxy
@@ -43,7 +44,7 @@ class ProxyClient:
          returns
         dict {'url': type[str],
               'status_response': Type[str],
-              'headers': Type[list],
+              'headers': Type[CIMultiDictProxy],
               'content: Type[byte],
         :param url: str
         :return: dict

@@ -1,5 +1,6 @@
 import aiohttp
 import pytest
+from pathlib import Path
 from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
@@ -60,6 +61,13 @@ class TestProxy:
         assert prx.url == proxy
 
 
+def load_proxy_from_file():
+    path = Path(__file__).parent.parent / '.secrets/proxys'
+    with open(path) as f:
+        proxys = f.read().strip().split('\n')
+    return proxys
+
+
 class TestClient:
 
     @pytest.mark.parametrize('proxy', proxy_list)
@@ -72,5 +80,12 @@ class TestClient:
             assert sess.closed is False
         assert sess.closed is True
 
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    async def test_get(self, proxy):
+        proxy = Proxy.create_from_url(proxy)
+        async with ProxyClient(proxy=proxy) as sess:
+            answ = await sess.get()
+            assert answ['status_response'] == 200
 
 
