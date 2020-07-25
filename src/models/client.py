@@ -26,7 +26,7 @@ class ProxyClient:
         await self._create_connector()
         return self
 
-    async def _create_connector(self):
+    async def _create_connector(self) -> None:
         connector = ProxyConnector.from_url(self.proxy.url)
         self._session = aiohttp.ClientSession(connector=connector)
 
@@ -37,6 +37,29 @@ class ProxyClient:
     async def close(self) -> None:
         await self._session.close()
 
+    async def get(self, url: Optional[str] = None) -> dict:
+        """
+        get request from url or  self.test_url,
+         returns
+        dict {'url': type[str],
+              'status_response': Type[str],
+              'headers': Type[list],
+              'content: Type[byte],
+        :param url: str
+        :return: dict
+        """
+        if not url:
+            url = self.test_url
+        async with self._session.get(url=url) as response:
+            content = await response.read()
+            context = {
+                'url': url,
+                'status_response': response.status,
+                'headers': response.headers,
+                'content': content
+            }
+        return context
+
     @property
     def closed(self) -> bool:
         return self._session.closed
@@ -44,4 +67,5 @@ class ProxyClient:
     async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException],
                         exc_tb: Optional[TracebackType]) -> None:
         await self.close()
+
 

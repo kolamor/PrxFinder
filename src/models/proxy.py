@@ -52,13 +52,11 @@ class Proxy:
     @classmethod
     def create_from_url(cls, url: str) -> 'Proxy':
         proxy_type, user, password, hostport = _parse_proxy(url)
-
         if ':' in hostport:
             host, port = hostport.split(':')
             kw = {'host': host, "port": port}
         else:
             kw = {'host': hostport}
-
         self = cls(schema=proxy_type, user=user, password=password, **kw)
         return self
 
