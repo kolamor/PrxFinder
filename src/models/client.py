@@ -4,13 +4,25 @@ from aiohttp_proxy import ProxyConnector, ProxyType
 
 from  types import TracebackType
 from typing import Optional, Type
-import logging
 from .proxy import Proxy
 from multidict import CIMultiDictProxy
+import logging
+import time
 
 logger = logging.getLogger(__name__)
 
 __all__ = ('ProxyClient', )
+
+
+def latency(coro):
+    """wrapper -  approximately time read response"""
+    async def wrapped(*args, **kwargs):
+        t1 = time.time()
+        result = await coro(*args, **kwargs)
+        latency = time.time() - t1
+        result.update({'latency': latency})
+        return result
+    return wrapped
 
 
 class ProxyClient:
@@ -28,7 +40,8 @@ class ProxyClient:
         'content: Type[byte],
      }
      """
-    test_url = 'http://httpbin.org/status/200'
+    test_url: str = 'http://httpbin.org/status/200'
+    return_content: bool = False
 
     def __init__(self, proxy: Proxy, test_url: str = None):
         self.proxy = proxy
@@ -52,6 +65,7 @@ class ProxyClient:
     async def close(self) -> None:
         await self._session.close()
 
+    @latency
     async def get(self, url: Optional[str] = None) -> dict:
         """ get request from url or self.test_url,
         context =  {'url': type[str],
@@ -65,13 +79,14 @@ class ProxyClient:
         if not url:
             url = self.test_url
         async with self._session.get(url=url) as response:
-            content = await response.read()
             context = {
                 'url': url,
                 'status_response': response.status,
                 'headers': response.headers,
-                'content': content
             }
+            if self.return_content:
+                content = await response.read()
+                context.update({'content': content})
         return context
 
     @property

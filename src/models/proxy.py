@@ -5,7 +5,8 @@ try:
     from urllib2 import _parse_proxy
 except ImportError:
     from urllib.request import _parse_proxy
-from typing import Optional
+from typing import Optional, Union
+# from . import ProxyClient
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +71,34 @@ class Proxy:
 
 class ProxyChecker:
     """Check proxy"""
-    def __init__(self, proxy):
-        self._proxy = proxy
+    def __init__(self, proxy: Proxy):
+        self.proxy = proxy
+        self.proxy_policy = CheckProxyPolicy()
 
     @classmethod
     async def check(cls, proxy: Proxy) -> 'ProxyChecker':
         self = cls(proxy=proxy)
         return self
 
-    async def __check(self):
-        pass
+    async def check_proxy(self):
+        answer = None
+        async with ProxyClient(proxy=self.proxy) as sess:
+            try:
+                answer = await sess.get()
+            except Exception as e:
+                logger.info(f'{Proxy} -- {e}, -- {e.args}')
+        is_valid = self.check_policy(answer)
+
+
+    def check_policy(self, data: dict) -> bool:
+        return self.proxy_policy.is_valid(data=data)
+
+
+class CheckProxyPolicy:
+    status_response = 200
+
+    def is_valid(self, data: Union[dict, str, None]) -> bool:
+        if data and data['status_response'] == self.status_response:
+            return True
+        return False
+

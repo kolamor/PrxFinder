@@ -80,6 +80,8 @@ class TestClient:
             assert sess.closed is False
         assert sess.closed is True
 
+   # TODO create functions tests
+
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
     async def test_get(self, proxy):
@@ -87,5 +89,5 @@ class TestClient:
         async with ProxyClient(proxy=proxy) as sess:
             answ = await sess.get()
             assert answ['status_response'] == 200
-
+            assert 'latency' in answ.keys()
 
