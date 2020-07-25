@@ -14,6 +14,20 @@ __all__ = ('ProxyClient', )
 
 
 class ProxyClient:
+    """Support http(s), socks(4,5) proxy
+     Use
+     proxy = Proxy.create_from_url(proxy)
+     async with ProxyClient(proxy=proxy) as sess:
+         answ = await sess.get()
+     assert answ['status_response'] == 200
+
+     answ: Type[Dict] = {
+        'url': type[str],
+        'status_response': Type[str],
+        'headers': Type[CIMultiDictProxy],
+        'content: Type[byte],
+     }
+     """
     test_url = 'http://httpbin.org/status/200'
 
     def __init__(self, proxy: Proxy, test_url: str = None):
@@ -39,15 +53,14 @@ class ProxyClient:
         await self._session.close()
 
     async def get(self, url: Optional[str] = None) -> dict:
-        """
-        get request from url or  self.test_url,
-         returns
-        dict {'url': type[str],
-              'status_response': Type[str],
-              'headers': Type[CIMultiDictProxy],
-              'content: Type[byte],
+        """ get request from url or self.test_url,
+        context =  {'url': type[str],
+                    'status_response': Type[str],
+                    'headers': Type[CIMultiDictProxy],
+                    'content: Type[byte],
+                }
         :param url: str
-        :return: dict
+        :return: context: dict
         """
         if not url:
             url = self.test_url
