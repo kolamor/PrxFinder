@@ -6,7 +6,7 @@ try:
 except ImportError:
     from urllib.request import _parse_proxy
 from typing import Optional, Union
-# from . import ProxyClient
+from .client import ProxyClient
 
 logger = logging.getLogger(__name__)
 
@@ -65,30 +65,55 @@ class Proxy:
     def url(self):
         return self._create_uri()
 
+    def as_dict(self):
+        keys = ('host', 'port', 'user', 'password', 'latency', 'is_alive', 'sheme', )
+        context = {k: v for k, v in self.__dict__ .items() if k in keys}
+        return context
+
+    def __repr__(self):
+        return self.as_dict()
+
     def __str__(self):
         return self._create_uri()
 
 
 class ProxyChecker:
     """Check proxy"""
+
     def __init__(self, proxy: Proxy):
         self.proxy = proxy
         self.proxy_policy = CheckProxyPolicy()
 
     @classmethod
-    async def check(cls, proxy: Proxy) -> 'ProxyChecker':
+    async def check(cls, proxy: Proxy) -> 'Proxy':
         self = cls(proxy=proxy)
-        return self
+        proxy = await self.check_proxy()
+        return proxy
 
-    async def check_proxy(self):
+    async def check_proxy(self) -> Proxy:
         answer = None
         async with ProxyClient(proxy=self.proxy) as sess:
             try:
                 answer = await sess.get()
             except Exception as e:
                 logger.info(f'{Proxy} -- {e}, -- {e.args}')
+        if not answer:
+            self.proxy.is_alive = False
+            return self.proxy
         is_valid = self.check_policy(answer)
+        if is_valid:
+            self.rebuild_proxy(answer=answer)
+        else:
+            self.proxy.is_alive = False
+        return self.proxy
 
+    def rebuild_proxy(self, answer: dict) -> None:
+        self.proxy.latency = float(round(answer['latency'], 2))
+        status = answer.get('status_response', False)
+        if status and int(status) < 400:
+            self.proxy.is_alive = True
+        else:
+            self.proxy.is_alive = False
 
     def check_policy(self, data: dict) -> bool:
         return self.proxy_policy.is_valid(data=data)

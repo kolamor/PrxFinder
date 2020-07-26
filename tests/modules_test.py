@@ -5,7 +5,8 @@ from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
 from src.parse_module.utils import IPPortPatternLine
-from src import ProxyClient, Proxy
+from src import ProxyClient
+from src import ProxyChecker, Proxy
 
 
 @pytest.mark.asyncio
@@ -82,6 +83,7 @@ class TestClient:
 
    # TODO create functions tests
 
+    @pytest.mark.skip
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
     async def test_get(self, proxy):
@@ -90,4 +92,21 @@ class TestClient:
             answ = await sess.get()
             assert answ['status_response'] == 200
             assert 'latency' in answ.keys()
+
+
+class TestProxyChecker:
+
+    # @pytest.mark.skip
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    async def test(self, proxy):
+        proxy = Proxy.create_from_url(proxy)
+        check_proxy = await ProxyChecker.check(proxy=proxy)
+        assert check_proxy.is_alive is True
+        assert isinstance(check_proxy.latency, float)
+        assert isinstance(check_proxy.as_dict(), dict)
+        print(check_proxy.as_dict())
+
+
+
 

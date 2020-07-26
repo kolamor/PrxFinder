@@ -2,10 +2,9 @@ import aiohttp
 import asyncio
 from aiohttp_proxy import ProxyConnector, ProxyType
 
-from  types import TracebackType
+from types import TracebackType
 from typing import Optional, Type
-from .proxy import Proxy
-from multidict import CIMultiDictProxy
+# from .proxy import Proxy
 import logging
 import time
 
@@ -15,7 +14,7 @@ __all__ = ('ProxyClient', )
 
 
 def latency(coro):
-    """wrapper -  approximately time read response"""
+    """wrapper -  approximately time read response, adds latency to returned dict"""
     async def wrapped(*args, **kwargs):
         t1 = time.time()
         result = await coro(*args, **kwargs)
@@ -43,13 +42,13 @@ class ProxyClient:
     test_url: str = 'http://httpbin.org/status/200'
     return_content: bool = False
 
-    def __init__(self, proxy: Proxy, test_url: str = None):
+    def __init__(self, proxy: 'Proxy', test_url: str = None):
         self.proxy = proxy
         if test_url:
             self.test_url = test_url
 
     @classmethod
-    async def create(cls, proxy: Proxy, test_url: str = None) -> 'ProxyClient':
+    async def create(cls, proxy: 'Proxy', test_url: str = None) -> 'ProxyClient':
         self = cls(proxy=proxy, test_url=test_url)
         await self._create_connector()
         return self
