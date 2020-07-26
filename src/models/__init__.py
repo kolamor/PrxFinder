@@ -1,3 +1,3 @@
-from .client import ProxyClient
+from .client import ProxyClient, Proxy
 from .db import *
-from .proxy import Proxy, Location, ProxyChecker
+from .checker import ProxyChecker
