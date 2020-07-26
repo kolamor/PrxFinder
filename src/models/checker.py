@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import logging
 from typing import Optional, Union
 from .client import ProxyClient, Proxy
@@ -18,6 +17,7 @@ class ProxyChecker:
 
     @classmethod
     async def check(cls, proxy: Proxy) -> 'Proxy':
+        """shortcut"""
         self = cls(proxy=proxy)
         proxy = await self.check_proxy()
         return proxy
@@ -41,11 +41,7 @@ class ProxyChecker:
 
     def rebuild_proxy(self, answer: dict) -> None:
         self.proxy.latency = float(round(answer['latency'], 2))
-        status = answer.get('status_response', False)
-        if status and int(status) < 400:
-            self.proxy.is_alive = True
-        else:
-            self.proxy.is_alive = False
+        self.proxy.is_alive = True
 
     def check_policy(self, data: dict) -> bool:
         return self.proxy_policy.is_valid(data=data)

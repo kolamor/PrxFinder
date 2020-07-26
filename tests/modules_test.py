@@ -96,7 +96,7 @@ class TestClient:
 
 class TestProxyChecker:
 
-    # @pytest.mark.skip
+    @pytest.mark.skip
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
     async def test(self, proxy):
@@ -105,6 +105,9 @@ class TestProxyChecker:
         assert check_proxy.is_alive is True
         assert isinstance(check_proxy.latency, float)
         assert isinstance(check_proxy.as_dict(), dict)
+        keys = ['host', 'port', 'scheme', 'user', 'password']
+        for k in keys:
+            assert k in check_proxy.as_dict()
         print(check_proxy.as_dict())
 
 
