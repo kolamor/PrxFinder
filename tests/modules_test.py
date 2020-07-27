@@ -1,12 +1,14 @@
+import asyncio
 import aiohttp
 import pytest
+import os
 from pathlib import Path
 from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
 from src.parse_module.utils import IPPortPatternLine
 from src import ProxyClient
-from src import ProxyChecker, Proxy
+from src import ProxyChecker, Proxy, TaskProxyCheckHandler
 
 
 @pytest.mark.asyncio
@@ -82,8 +84,7 @@ class TestClient:
         assert sess.closed is True
 
    # TODO create functions tests
-
-    @pytest.mark.skip
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
     async def test_get(self, proxy):
@@ -96,10 +97,10 @@ class TestClient:
 
 class TestProxyChecker:
 
-    @pytest.mark.skip
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
-    async def test(self, proxy):
+    async def test_check(self, proxy):
         proxy = Proxy.create_from_url(proxy)
         check_proxy = await ProxyChecker.check(proxy=proxy)
         assert check_proxy.is_alive is True
@@ -108,7 +109,38 @@ class TestProxyChecker:
         keys = ['host', 'port', 'scheme', 'user', 'password']
         for k in keys:
             assert k in check_proxy.as_dict()
-        print(check_proxy.as_dict())
+
+
+class TestTaskProxyCheckHandler:
+
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    async def test_processing(self, proxy):
+        queue_in = asyncio.Queue(2)
+        queue_out = asyncio.Queue(2)
+        proxy = Proxy.create_from_url(proxy)
+        handler = TaskProxyCheckHandler(incoming_queue=queue_in, outgoing_queue=queue_out)
+        await handler.processing_task(proxy)
+        proxy_out = await asyncio.wait_for(queue_out.get(), 1)
+        queue_out.task_done()
+        assert isinstance(proxy_out, Proxy)
+
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    async def test_start(self, proxy):
+        queue_in = asyncio.Queue(2)
+        queue_out = asyncio.Queue(2)
+        proxy = Proxy.create_from_url(proxy)
+        handler = TaskProxyCheckHandler(incoming_queue=queue_in, outgoing_queue=queue_out)
+        await handler.start()
+        await queue_in.put(proxy)
+        proxy_out = await asyncio.wait_for(queue_out.get(), 30)
+        queue_out.task_done()
+        handler.stop()
+        assert isinstance(proxy_out, Proxy)
+
 
 
 
