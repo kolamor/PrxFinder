@@ -64,6 +64,7 @@ class TestProxy:
         assert prx.url == proxy
 
 
+@pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
 def load_proxy_from_file():
     path = Path(__file__).parent.parent / '.secrets/proxys'
     with open(path) as f:
