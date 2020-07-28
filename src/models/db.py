@@ -21,7 +21,7 @@ proxy_table = Table(
     Column('user_', VARCHAR, nullable=True),
     Column('password', VARCHAR, nullable=True),
     Column('date_creation', DateTime(timezone=False)),
-    Column('protocol', VARCHAR(6)),
+    Column('scheme', VARCHAR(6)),
     Column('location_code', VARCHAR, ForeignKey('location.code', ondelete='SET NULL'), ),
     Column('latency', Integer, nullable=True),
     Column('is_alive', BOOLEAN, nullable=True),

@@ -12,3 +12,4 @@ venv
 */.secret*/*
 *.secret*
 /htmlcov
+.local_conf.yaml

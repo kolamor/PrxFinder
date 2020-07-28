@@ -3,6 +3,8 @@ import aiohttp
 import asyncio
 import logging
 from aiohttp import web, ClientSession, TCPConnector
+
+from . import TaskProxyCheckHandler
 from .routes import setup_routes
 
 logger = logging.getLogger(__name__)
@@ -23,13 +25,16 @@ async def on_start(app):
     config = app['config']
     tcp_config = {}
     app['http_client'] = aiohttp.ClientSession(connector=create_tcp_connector(tcp_config))
-    # app['db'] = await asyncpgsa.create_pool(dsn=config['database_uri'])
+    app['db'] = await asyncpgsa.create_pool(dsn=config['database_uri'])
+    app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues'))
+    app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues'))
+    await start_check_proxy(app=app, config=config)
 
 
 async def on_shutdown(app):
     logger.info('on_shutdown')
-    # await app['db'].close()
-    # logger.info('PSQL closed')
+    await app['db'].close()
+    logger.info('PSQL closed')
     await app['http_client'].close()
     logger.info('http_client closed')
 
@@ -47,3 +52,13 @@ def create_tcp_connector(config: dict) -> TCPConnector:
         **config
     )
     return connector
+
+
+async def start_check_proxy(app: aiohttp.web.Application , config: dict):
+    if config.get('start_check_proxy', False) is True:
+        handler = TaskProxyCheckHandler(incoming_queue=app['in_checker_queue'],
+                                        outgoing_queue=app['out_checker_queue'],
+                                        max_tasks=config.get('limit_check_proxy', 50))
+        await handler.start()
+        app['proxy_check_handler'] = handler
+        return

@@ -28,3 +28,4 @@ class ProxyToDB:
             async with conn.transaction():
                 query = insert(self.table_proxy).values(**proxy).on_conflict_do_nothing()
                 res = await conn.execute(query)
+                return res
