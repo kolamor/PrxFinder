@@ -9,12 +9,12 @@ import datetime
 from sqlalchemy.sql import expression
 from sqlalchemy.ext.compiler import compiles
 
-__all__ = ('proxy', 'location')
+__all__ = ('proxy_table', 'location_table')
 
 meta = MetaData()
 
 # Model table Proxy
-proxy = Table(
+proxy_table = Table(
     'proxy', meta,
     Column('host', VARCHAR),
     Column('port', Integer),
@@ -30,7 +30,7 @@ proxy = Table(
 )
 
 # Model table location, use from proxy sort
-location = Table(
+location_table = Table(
     'location', meta,
     Column('city', VARCHAR),
     Column('country', VARCHAR),
