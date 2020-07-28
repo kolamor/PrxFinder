@@ -26,7 +26,7 @@ class ProxyToDB:
         self.table_proxy = table_proxy
         self.table_location = table_location
 
-    def insert_proxy(self, kwargs):
+    async def insert_proxy(self, kwargs):
         """Insert proxy
         INSERT INTO {self.table.proxy} ("host", "port", "user_", "password", "data_creation", "protocol", "latency",
          "is_alive", "anonymous", "location") VALUES (...) ON CONFLICT DO NOTHING
