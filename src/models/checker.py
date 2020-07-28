@@ -81,7 +81,7 @@ class TaskProxyCheckHandler:
         while True:
             await self.max_tasks_semaphore.acquire()
             try:
-                proxy = await asyncio.wait_for(self.incoming_queue.get(), 5)
+                proxy = await self.incoming_queue.get()
             except asyncio.TimeoutError:
                 continue
             self.incoming_queue.task_done()

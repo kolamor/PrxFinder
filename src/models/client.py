@@ -23,8 +23,8 @@ def latency(coro):
     async def wrapped(*args, **kwargs):
         t1 = time.time()
         result = await coro(*args, **kwargs)
-        latency = time.time() - t1
-        result.update({'latency': latency})
+        _latency = time.time() - t1
+        result.update({'latency': _latency})
         return result
     return wrapped
 
