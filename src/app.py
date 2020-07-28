@@ -3,8 +3,7 @@ import aiohttp
 import asyncio
 import logging
 from aiohttp import web, ClientSession, TCPConnector
-
-from . import TaskProxyCheckHandler
+import src
 from .routes import setup_routes
 
 logger = logging.getLogger(__name__)
@@ -25,9 +24,13 @@ async def on_start(app):
     config = app['config']
     tcp_config = {}
     app['http_client'] = aiohttp.ClientSession(connector=create_tcp_connector(tcp_config))
-    app['db'] = await asyncpgsa.create_pool(dsn=config['database_uri'])
-    app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues'))
-    app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues'))
+    db_connect_kwargs = {}
+    app['db'] = await asyncpgsa.create_pool(dsn=config['POSTGRESQL_URI'], **db_connect_kwargs)
+    app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
+    app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
+    app['proxy_save_db_queue'] = asyncio.Queue()
+    app['proxy_to_db'] = src.ProxyToDB(db_connect=app['db'], table_proxy=src.proxy_table,
+                                       table_location=src.location_table)
     await start_check_proxy(app=app, config=config)
 
 
@@ -55,10 +58,11 @@ def create_tcp_connector(config: dict) -> TCPConnector:
 
 
 async def start_check_proxy(app: aiohttp.web.Application , config: dict):
-    if config.get('start_check_proxy', False) is True:
-        handler = TaskProxyCheckHandler(incoming_queue=app['in_checker_queue'],
-                                        outgoing_queue=app['out_checker_queue'],
-                                        max_tasks=config.get('limit_check_proxy', 50))
+    if config.get('start_check_proxy', True) is True:
+        handler = src.TaskProxyCheckHandler(incoming_queue=app['in_checker_queue'],
+                                            outgoing_queue=app['out_checker_queue'],
+                                            max_tasks=config.get('limit_check_proxy', 50))
         await handler.start()
         app['proxy_check_handler'] = handler
+        print('Start proxy_check_handler')
         return

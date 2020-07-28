@@ -28,5 +28,5 @@ class ProxyHandler(View):
             logger.error(f'{e} ::: {e.args}')
             return json_response(status=400, data={'Error': f'Bad_request {e} :: {e.args}'})
         for prx in proxys:
-            await self.request.app['queue_for_checker'].put(prx)
+            await self.request.app['proxy_save_db_queue'].put(prx)
         return json_response(status=200, data={'status': 'put to processing'})

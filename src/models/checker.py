@@ -80,10 +80,7 @@ class TaskProxyCheckHandler:
     async def _start(self) -> None:
         while True:
             await self.max_tasks_semaphore.acquire()
-            try:
-                proxy = await self.incoming_queue.get()
-            except asyncio.TimeoutError:
-                continue
+            proxy = await self.incoming_queue.get()
             self.incoming_queue.task_done()
             if not isinstance(proxy, Proxy):
                 logger.error(f'{proxy} -- not instance Proxy')

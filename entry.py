@@ -20,7 +20,7 @@ parser.add_argument('-c', '--config', type=argparse.FileType('r'), 	help='Path t
 
 args = parser.parse_args()
 config = load_config(args.config)
-app = create_app(config=load_config(args.config))
+app = create_app(config=config)
 
 if args.reload:
     print('Start with code reload')
