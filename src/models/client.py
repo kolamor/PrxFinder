@@ -118,7 +118,7 @@ class Proxy:
                  location: Optional[Location] = None,
                  scheme: str = 'http',
                  is_alive: Optional[bool] = None,
-                 latency: Optional[int] = None,
+                 latency: Optional[float] = None,
                  checked_at: Optional[datetime.datetime] = None
                  ):
         self.host = host

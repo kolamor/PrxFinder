@@ -197,15 +197,14 @@ class TestTaskHandlerToDB:
         query = sqlalchemy.text(f"select * from proxy where host= $1 and port = $2")
         async with db_pool.acquire() as conn:
             res = await conn.fetchrow(query, proxy.host, proxy.port)
-            assert res['host'] == proxy.host and res['port'] == proxy.port
+            assert str(res['host']) == proxy.host and res['port'] == proxy.port
         await clear_test_data.__anext__()
         handler.stop()
 
 
 class TestProxyDb:
 
-
-    # @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
     @pytest.mark.db
@@ -214,12 +213,8 @@ class TestProxyDb:
         proxy_db = PsqlDb(db_connect=db_pool, table_proxy=proxy_table, table_location=location_table)
         await proxy_db.insert_proxy(**proxy.as_dict())
         res = await proxy_db.select_proxy_pm(host=proxy.host, port=proxy.port)
-        assert res['port'] == proxy.port and res['host'] == proxy.host
+        assert res['port'] == proxy.port and str(res['host']) == proxy.host
         async with db_pool.acquire() as conn:
             query = sqlalchemy.text('delete from proxy where (host = $1 and port = $2)')
             res = await conn.execute(query, proxy.host, proxy.port)
-
-
-
-
 
