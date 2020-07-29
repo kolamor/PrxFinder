@@ -112,7 +112,7 @@ class Proxy:
     """
     def __init__(self,
                  host: str,
-                 port: str,
+                 port: int,
                  user: Optional[str],
                  password: Optional[str],
                  location: Optional[Location] = None,
@@ -122,7 +122,7 @@ class Proxy:
                  checked_at: Optional[datetime.datetime] = None
                  ):
         self.host = host
-        self.port = port
+        self.port = int(port)
         self.user = user
         self.password = password
         self.location = location

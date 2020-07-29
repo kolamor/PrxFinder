@@ -78,6 +78,7 @@ class TaskProxyCheckHandler:
         self._instance_start = create_task(self._start())
 
     async def _start(self) -> None:
+        print(f'{self.__class__} starting')
         while True:
             await self.max_tasks_semaphore.acquire()
             proxy = await self.incoming_queue.get()
@@ -103,9 +104,9 @@ class TaskProxyCheckHandler:
     async def put_proxy_to_queue(self, proxy: Proxy) -> None:
         await self.outgoing_queue.put(proxy)
 
-    def is_stoped(self) -> bool:
+    def is_running(self) -> bool:
         if self._instance_start:
-            return self._instance_start.cancelled()
+            return not self._instance_start.cancelled()
         else:
             return True
 

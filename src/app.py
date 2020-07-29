@@ -29,8 +29,8 @@ async def on_start(app):
     app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['proxy_save_db_queue'] = asyncio.Queue()
-    app['proxy_to_db'] = src.ProxyToDB(db_connect=app['db'], table_proxy=src.proxy_table,
-                                       table_location=src.location_table)
+    app['proxy_to_db'] = src.PsqlDb(db_connect=app['db'], table_proxy=src.proxy_table,
+                                    table_location=src.location_table)
     await start_check_proxy(app=app, config=config)
 
 

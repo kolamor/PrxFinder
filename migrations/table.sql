@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS proxy(
     user_ VARCHAR,
     password VARCHAR,
     date_creation timestamp without time zone default (now() at time zone 'utc'),
-    protocol VARCHAR(6),
+    scheme VARCHAR(6),
     location_code VARCHAR, FOREIGN KEY (location_code) REFERENCES location(code),
     latency INTEGER,
     anonymous BOOLEAN,

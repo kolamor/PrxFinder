@@ -7,9 +7,12 @@ from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
 from src.parse_module.utils import IPPortPatternLine
-from src import ProxyClient
-from src import ProxyChecker, Proxy, TaskProxyCheckHandler
-
+from src import ProxyClient, TaskHandlerToDB, PsqlDb
+from src import ProxyChecker, Proxy, TaskProxyCheckHandler, proxy_table, location_table
+import asyncpgsa
+import asyncpg
+import sqlalchemy
+import yaml
 
 @pytest.mark.asyncio
 async def test_create_tcp_connector():
@@ -144,6 +147,59 @@ class TestTaskProxyCheckHandler:
         queue_out.task_done()
         handler.stop()
         assert isinstance(proxy_out, Proxy)
+
+
+@pytest.mark.asyncio
+@pytest.mark.db
+@pytest.fixture()
+async def db_pool():
+
+    default_file = Path(__file__).parent.parent / '.secrets/local_conf.yaml'
+    with open(default_file, 'r') as f:
+        config = yaml.safe_load(f)
+    db_connect_kwargs = {}
+    pool = await asyncpgsa.create_pool(dsn=config.get('POSTGRESQL_URI'), **db_connect_kwargs)
+    yield pool
+    await pool.close()
+
+
+class TestTaskHandlerToDB:
+
+    async def clear_test_data(self, pool_db, proxy: Proxy):
+        async with pool_db.acquire() as conn:
+            query = sqlalchemy.text(f"select * from proxy where host= $1 and port = $2")
+            res = await conn.fetchrow(query, proxy.host, proxy.port)
+            if res:
+                query = sqlalchemy.text('delete from proxy where (host = $1 and port = $2)')
+                res = await conn.execute(query, proxy.host, proxy.port)
+            yield
+            query = sqlalchemy.text('delete from proxy where (host = $1 and port = $2)')
+            res = await conn.execute(query, proxy.host, proxy.port)
+            yield
+
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    @pytest.mark.db
+    async def test_start(self, proxy, db_pool: asyncpg.pool.Pool, caplog):
+        import logging
+        caplog.set_level(logging.DEBUG)
+        queue_in = asyncio.Queue(2)
+        proxy = Proxy.create_from_url(proxy)
+        psql_db = PsqlDb(db_connect=db_pool, table_proxy=proxy_table, table_location=location_table)
+        handler = TaskHandlerToDB(incoming_queue=queue_in, psql_db=psql_db)
+        await handler.start()
+        assert handler.is_running() is True
+        clear_test_data = self.clear_test_data(db_pool, proxy)
+        await clear_test_data.__anext__()
+        await queue_in.put(proxy)
+        await asyncio.sleep(1)
+        query = sqlalchemy.text(f"select * from proxy where host= $1 and port = $2")
+        async with db_pool.acquire() as conn:
+            res = await conn.fetchrow(query, proxy.host, proxy.port)
+            assert res['host'] == proxy.host and res['port'] == proxy.port
+        await clear_test_data.__anext__()
+        handler.stop()
 
 
 
