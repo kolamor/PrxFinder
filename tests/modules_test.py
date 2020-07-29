@@ -113,7 +113,7 @@ class TestProxyChecker:
         assert check_proxy.is_alive is True
         assert isinstance(check_proxy.latency, float)
         assert isinstance(check_proxy.as_dict(), dict)
-        keys = ['host', 'port', 'scheme', 'user', 'password']
+        keys = ['host', 'port', 'scheme', 'login', 'password']
         for k in keys:
             assert k in check_proxy.as_dict()
 
@@ -200,6 +200,24 @@ class TestTaskHandlerToDB:
             assert res['host'] == proxy.host and res['port'] == proxy.port
         await clear_test_data.__anext__()
         handler.stop()
+
+
+class TestProxyDb:
+
+
+    # @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    @pytest.mark.db
+    async def test_select(self, proxy, db_pool: asyncpg.pool.Pool):
+        proxy = Proxy.create_from_url(url=proxy)
+        proxy_db = PsqlDb(db_connect=db_pool, table_proxy=proxy_table, table_location=location_table)
+        await proxy_db.insert_proxy(**proxy.as_dict())
+        res = await proxy_db.select_proxy_pm(host=proxy.host, port=proxy.port)
+        assert res['port'] == proxy.port and res['host'] == proxy.host
+        async with db_pool.acquire() as conn:
+            query = sqlalchemy.text('delete from proxy where (host = $1 and port = $2)')
+            res = await conn.execute(query, proxy.host, proxy.port)
 
 
 

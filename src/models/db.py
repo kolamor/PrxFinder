@@ -18,7 +18,7 @@ proxy_table = Table(
     'proxy', meta,
     Column('host', VARCHAR),
     Column('port', Integer),
-    Column('user_', VARCHAR, nullable=True),
+    Column('login', VARCHAR, nullable=True),
     Column('password', VARCHAR, nullable=True),
     Column('date_creation', DateTime(timezone=False)),
     Column('scheme', VARCHAR(6)),

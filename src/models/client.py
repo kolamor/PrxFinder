@@ -113,7 +113,7 @@ class Proxy:
     def __init__(self,
                  host: str,
                  port: int,
-                 user: Optional[str],
+                 login: Optional[str],
                  password: Optional[str],
                  location: Optional[Location] = None,
                  scheme: str = 'http',
@@ -123,7 +123,7 @@ class Proxy:
                  ):
         self.host = host
         self.port = int(port)
-        self.user = user
+        self.login = login
         self.password = password
         self.location = location
         self.scheme = scheme
@@ -133,21 +133,21 @@ class Proxy:
 
     def _create_uri(self):
         host_port = f'{self.host}:{self.port}'
-        if self.user and self.password:
-            uri = f'{self.scheme}://{self.user}:{self.password}@{host_port}'
+        if self.login and self.password:
+            uri = f'{self.scheme}://{self.login}:{self.password}@{host_port}'
         else:
             uri = f'{self.scheme}://{host_port}'
         return uri
 
     @classmethod
     def create_from_url(cls, url: str) -> 'Proxy':
-        proxy_type, user, password, hostport = _parse_proxy(url)
+        proxy_type, login, password, hostport = _parse_proxy(url)
         if ':' in hostport:
             host, port = hostport.split(':')
             kw = {'host': host, "port": port}
         else:
             kw = {'host': hostport}
-        self = cls(scheme=proxy_type, user=user, password=password, **kw)
+        self = cls(scheme=proxy_type, login=login, password=password, **kw)
         return self
 
     @property
@@ -155,7 +155,7 @@ class Proxy:
         return self._create_uri()
 
     def as_dict(self):
-        keys = ('host', 'port', 'user', 'password', 'latency', 'is_alive', 'scheme', )
+        keys = ('host', 'port', 'login', 'password', 'latency', 'is_alive', 'scheme', )
         context = {k: v for k, v in self.__dict__ .items() if k in keys}
         return context
 

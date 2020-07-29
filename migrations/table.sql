@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS location(
 CREATE TABLE IF NOT EXISTS proxy(
     host VARCHAR,
     port INTEGER,
-    user_ VARCHAR,
+    login VARCHAR,
     password VARCHAR,
     date_creation timestamp without time zone default (now() at time zone 'utc'),
     scheme VARCHAR(6),

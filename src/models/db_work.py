@@ -56,7 +56,7 @@ class PsqlDb:
 
     async def insert_proxy(self, **kwargs):
         """Insert proxy
-        INSERT INTO {self.table.proxy} ("host", "port", "user_", "password", "data_creation", "protocol", "latency",
+        INSERT INTO {self.table.proxy} ("host", "port", "login", "password", "data_creation", "protocol", "latency",
          "is_alive", "anonymous", "location") VALUES (...) ON CONFLICT DO NOTHING
         """
         async with self._db.acquire() as conn:
@@ -75,7 +75,7 @@ class PsqlDb:
                     self.table_proxy.c.host == host,
                     self.table_proxy.c.port == port
                 ))
-                res = await conn.fet(query)
+                res = await conn.fetchrow(query)
                 return res
 
 
@@ -107,8 +107,6 @@ class TaskHandlerToDB:
         """save db"""
         try:
             dict_proxy = proxy.as_dict()
-            user_ = dict_proxy.pop('user')
-            dict_proxy.update({'user_': user_})
             res = await self.psql_db.insert_proxy(**dict_proxy)
             logger.debug(f'{dict_proxy} ::: {res}')
         except Exception as e:
