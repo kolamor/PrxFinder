@@ -14,6 +14,7 @@ import asyncpg
 import sqlalchemy
 import yaml
 
+
 @pytest.mark.asyncio
 async def test_create_tcp_connector():
     tcp_conn = create_tcp_connector({})
@@ -218,3 +219,20 @@ class TestProxyDb:
             query = sqlalchemy.text('delete from proxy where (host = $1 and port = $2)')
             res = await conn.execute(query, proxy.host, proxy.port)
 
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    @pytest.mark.db
+    async def test_insert_delete(self, proxy, db_pool: asyncpg.pool.Pool):
+        proxy_obj = Proxy.create_from_url(url=proxy)
+        proxy_db = PsqlDb(db_connect=db_pool, table_proxy=proxy_table, table_location=location_table)
+        await proxy_db.insert_proxy(**proxy_obj.as_dict())
+        proxy_2_obj = Proxy.create_from_url(url=proxy)
+        proxy_2_obj.login = 'test_3425'
+        proxy_2_obj.password = 'test_pass_3425'
+        await proxy_db.update_proxy_pm(**proxy_2_obj.as_dict())
+        res = await proxy_db.select_proxy_pm(host=proxy_2_obj.host, port=proxy_2_obj.port)
+        assert res['password'] == proxy_2_obj.password and res['login'] == proxy_2_obj.login
+        await proxy_db.delete_proxy_pm(host=proxy_2_obj.host, port=proxy_2_obj.port)
+        res = await proxy_db.select_proxy_pm(host=proxy_2_obj.host, port=proxy_2_obj.port)
+        assert res is None

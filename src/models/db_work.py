@@ -3,7 +3,7 @@ import asyncpg
 import logging
 from typing import Optional
 # from .db import proxy_table, location_table
-from sqlalchemy import Table, select, update, and_, or_
+from sqlalchemy import Table, select, update, and_, or_, delete
 from sqlalchemy.dialects.postgresql import insert
 import sys
 from . import Proxy, proxy_table
@@ -60,10 +60,9 @@ class PsqlDb:
          "is_alive", "anonymous", "location") VALUES (...) ON CONFLICT DO NOTHING
         """
         async with self._db.acquire() as conn:
-            async with conn.transaction():
-                query = insert(self.table_proxy).values(**kwargs).on_conflict_do_nothing()
-                res = await conn.execute(query)
-                return res
+            query = insert(self.table_proxy).values(**kwargs).on_conflict_do_nothing()
+            res = await conn.execute(query)
+            return res
 
     async def select_proxy_pm(self, host: str, port: int):
         """select proxy
@@ -76,7 +75,25 @@ class PsqlDb:
                     self.table_proxy.c.port == port
                 ))
                 res = await conn.fetchrow(query)
-                return res
+        return res
+
+    async def delete_proxy_pm(self, host: str, port: int):
+        async with self._db.acquire() as conn:
+            query = delete(self.table_proxy).where(and_(
+                self.table_proxy.c.host == host,
+                self.table_proxy.c.port == port
+            ))
+            res = await conn.execute(query)
+        return res
+
+    async def update_proxy_pm(self, **kwargs):
+        async with self._db.acquire() as conn:
+            query = update(self.table_proxy).where(and_(
+                self.table_proxy.c.host == kwargs['host'],
+                self.table_proxy.c.port == kwargs['port']
+            )).values(**kwargs)
+            res = await conn.execute(query)
+        return res
 
 
 class TaskHandlerToDB:
