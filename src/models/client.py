@@ -4,7 +4,7 @@ from aiohttp_proxy import ProxyConnector, ProxyType
 
 import datetime
 from types import TracebackType
-from typing import Optional, Type
+from typing import Optional, Type, Union
 # from .proxy import Proxy
 import logging
 import time
@@ -103,7 +103,39 @@ class ProxyClient:
 
 
 class Location:
-    pass
+    keys: tuple = ('ip', 'country_code', 'country_name', 'region_code', 'city', 'zip_code', 'time_zone', 'latitude',
+            'longitude', 'metro_code',)
+
+    def __init__(self,
+                 ip: str,
+                 country_code: Optional[str] = None,
+                 country_name: Optional[str] = None,
+                 region_code: Optional[str] = None,
+                 city: Optional[str] = None,
+                 zip_code: Union[str, int] = None,
+                 time_zone: Optional[str] = None,
+                 latitude: Optional[float] = None,
+                 longitude: Optional[float] = None,
+                 metro_code: Optional[float] = None
+                 ):
+        self.ip = ip
+        self.country_code = country_code
+        self.country_name = country_name
+        self.region_code = region_code
+        self.city = city
+        self.zip_code = zip_code
+        self.time_zone = time_zone
+        self.latitude = latitude
+        self.longitude = longitude
+        self.metro_code = metro_code
+
+    def as_dict(self, ignore_none: bool = False):
+        """return attrs as dict from keys, ignore_none - delete items with None value """
+        if ignore_none:
+            context = {k: v for k, v in self.__dict__.items() if k in self.keys and v is not None}
+        else:
+            context = {k: v for k, v in self.__dict__.items() if k in self.keys}
+        return context
 
 
 class Proxy:

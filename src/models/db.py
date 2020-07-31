@@ -24,7 +24,6 @@ proxy_table = Table(
     Column('password', VARCHAR, nullable=True),
     Column('date_creation', DateTime(timezone=False)),
     Column('scheme', VARCHAR(6)),
-    Column('location_code', VARCHAR, ForeignKey('location.code', ondelete='SET NULL'), ),
     Column('latency', Float, nullable=True),
     Column('is_alive', BOOLEAN, nullable=True),
     Column('anonymous', BOOLEAN, nullable=True),
@@ -34,9 +33,13 @@ proxy_table = Table(
 # Model table location, use from proxy sort
 location_table = Table(
     'location', meta,
+    Column('ip', INET, primary_key=True),
+    Column('country_name', VARCHAR),
+    Column('country_code', VARCHAR, nullable=True),
+    Column('region_code', nullable=True),
     Column('city', VARCHAR),
-    Column('country', VARCHAR),
-    Column('code', VARCHAR, primary_key=True),
-    Column('region_code', nullable=True)
-
+    Column('time_zone', VARCHAR),
+    Column('latitude', Float),
+    Column('longitude', Float),
+    Column('metro_code', VARCHAR)
 )

@@ -1,8 +1,13 @@
 CREATE TABLE IF NOT EXISTS location(
+    ip INET PRIMARY KEY,
+    country_name VARCHAR,
+    country_code VARCHAR,
+    region_code VARCHAR,
     city VARCHAR,
-    country VARCHAR,
-    code VARCHAR PRIMARY KEY,
-    region_code VARCHAR
+    time_zone VARCHAR,
+    latitude FLOAT,
+    longitude FLOAT,
+    metro_code VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS proxy(
@@ -12,7 +17,6 @@ CREATE TABLE IF NOT EXISTS proxy(
     password VARCHAR,
     date_creation timestamp without time zone default (now() at time zone 'utc'),
     scheme VARCHAR(6),
-    location_code VARCHAR, FOREIGN KEY (location_code) REFERENCES location(code),
     latency FLOAT,
     anonymous BOOLEAN,
     is_alive BOOLEAN,

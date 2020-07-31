@@ -1,8 +1,9 @@
 import asyncio
 import logging
-import  sys
+import sys
 from typing import Optional, Union
 from .client import ProxyClient, Proxy
+from abc import ABC, abstractmethod
 
 if sys.version_info < (3, 7)[:2]:
     from asyncio import ensure_future as create_task
@@ -11,7 +12,29 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy')
+__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTaskHandler')
+
+
+class BaseTaskHandler(ABC):
+    _instance_start: Optional[asyncio.Task] = None
+
+    async def start(self) -> None:
+        self._instance_start = create_task(self._start())
+
+    def is_running(self) -> bool:
+        if self._instance_start:
+            return not self._instance_start.cancelled()
+        else:
+            return True
+
+    def stop(self) -> None:
+        self._instance_start.cancel()
+
+    @abstractmethod
+    async def _start(self) -> None:
+        pass
+
+
 
 
 class ProxyChecker:
@@ -62,7 +85,7 @@ class CheckProxyPolicy:
         return False
 
 
-class TaskProxyCheckHandler:
+class TaskProxyCheckHandler(BaseTaskHandler):
     incoming_queue: asyncio.Queue
     outgoing_queue: asyncio.Queue
     max_tasks_semaphore: asyncio.Semaphore
@@ -72,10 +95,6 @@ class TaskProxyCheckHandler:
         self.incoming_queue = incoming_queue
         self.outgoing_queue = outgoing_queue
         self.max_tasks_semaphore = asyncio.Semaphore(max_tasks)
-        self._instance_start = None
-
-    async def start(self) -> None:
-        self._instance_start = create_task(self._start())
 
     async def _start(self) -> None:
         print(f'{self.__class__} starting')
@@ -104,12 +123,34 @@ class TaskProxyCheckHandler:
     async def put_proxy_to_queue(self, proxy: Proxy) -> None:
         await self.outgoing_queue.put(proxy)
 
-    def is_running(self) -> bool:
-        if self._instance_start:
-            return not self._instance_start.cancelled()
-        else:
-            return True
 
-    def stop(self) -> None:
-        self._instance_start.cancel()
+class ProxyLocation(BaseTaskHandler):
+    """
+
+    template_api_response: dict = {
+        "ip":"145.150.154.25",
+        "country_code":"RU",
+        "country_name":"Россия",
+        "region_code":"MOS",
+        "region_name":"МО",
+        "city":"Пушкино",
+        "zip_code":"141207",
+        "time_zone":"Europe/Moscow",
+        "latitude":56.0172,
+        "longitude":37.8667,
+        "metro_code":0}
+    """
+    template_api_response: dict
+    url_api_location: str = 'https://freegeoip.app/json/'
+    db_location = None
+    # http_session:
+
+    async def _start(self) -> None:
+        print('Start check location')
+
+    async def processing_task(self, proxy: Proxy):
+        pass
+
+    async def get_api(self, proxy: Proxy) -> dict:
+        pass
 
