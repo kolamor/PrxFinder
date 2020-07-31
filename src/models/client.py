@@ -15,7 +15,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('ProxyClient', 'Proxy')
+__all__ = ('ProxyClient', 'Proxy', 'Location')
 
 
 def latency(coro):
@@ -103,14 +103,15 @@ class ProxyClient:
 
 
 class Location:
-    keys: tuple = ('ip', 'country_code', 'country_name', 'region_code', 'city', 'zip_code', 'time_zone', 'latitude',
-            'longitude', 'metro_code',)
+    keys: tuple = ('ip', 'country_code', 'country_name', 'region_code', 'region_name', 'city', 'zip_code', 'time_zone',
+                   'latitude', 'longitude', 'metro_code',)
 
     def __init__(self,
                  ip: str,
                  country_code: Optional[str] = None,
                  country_name: Optional[str] = None,
                  region_code: Optional[str] = None,
+                 region_name: Optional[str] = None,
                  city: Optional[str] = None,
                  zip_code: Union[str, int] = None,
                  time_zone: Optional[str] = None,
@@ -122,6 +123,7 @@ class Location:
         self.country_code = country_code
         self.country_name = country_name
         self.region_code = region_code
+        self.region_name = region_name
         self.city = city
         self.zip_code = zip_code
         self.time_zone = time_zone
@@ -138,7 +140,7 @@ class Location:
         return context
 
     def __repr__(self):
-        return self.as_dict()
+        return str(self.as_dict())
 
 
 class Proxy:
@@ -166,7 +168,7 @@ class Proxy:
         self.latency = latency
         self.checked_at = checked_at
 
-    def _create_uri(self):
+    def _create_uri(self) -> str:
         host_port = f'{self.host}:{self.port}'
         if self.login and self.password:
             uri = f'{self.scheme}://{self.login}:{self.password}@{host_port}'
@@ -186,16 +188,16 @@ class Proxy:
         return self
 
     @property
-    def url(self):
+    def url(self) -> str:
         return self._create_uri()
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
         keys = ('host', 'port', 'login', 'password', 'latency', 'is_alive', 'scheme', )
         context = {k: v for k, v in self.__dict__ .items() if k in keys}
         return context
 
     def __repr__(self):
-        return self.as_dict()
+        return str(self.as_dict())
 
     def __str__(self):
         return self._create_uri()

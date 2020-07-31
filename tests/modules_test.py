@@ -7,7 +7,7 @@ from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
 from src.parse_module.utils import IPPortPatternLine
-from src import ProxyClient, TaskHandlerToDB, PsqlDb
+from src import ProxyClient, TaskHandlerToDB, PsqlDb, Location, ApiLocation
 from src import ProxyChecker, Proxy, TaskProxyCheckHandler, proxy_table, location_table
 import asyncpgsa
 import asyncpg
@@ -236,3 +236,16 @@ class TestProxyDb:
         await proxy_db.delete_proxy_pm(host=proxy_2_obj.host, port=proxy_2_obj.port)
         res = await proxy_db.select_proxy_pm(host=proxy_2_obj.host, port=proxy_2_obj.port)
         assert res is None
+
+
+class TestApiLocation:
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    async def test_api(self, proxy, aiohttp_session):
+        proxy = Proxy.create_from_url(proxy)
+        api_location = ApiLocation(http_session=aiohttp_session)
+        location = await api_location.find_location(proxy=proxy)
+        assert isinstance(location, Location)
+        for loc in location.keys:
+            assert loc in location.as_dict()

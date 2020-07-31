@@ -13,7 +13,7 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTaskHandler')
+__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTaskHandler', 'ApiLocation')
 
 
 class BaseTaskHandler(ABC):
@@ -150,15 +150,14 @@ class ApiLocation:
         if url_api_location:
             self.url_api_location = url_api_location
 
-    async def get_api(self, host: str) -> dict:
+    async def get_api(self, host: str) -> Optional[dict]:
         async with self.http_session.get(url=f'{self.url_api_location}{host}') as resp:
             if resp.status == 200:
                 _json = await resp.json()
                 return _json
-            else:
-                return {}
+            return
 
-    async def find_location(self, proxy: Union[Type[Proxy], str]) -> Optional[Location]:
+    async def find_location(self, proxy: Union[Proxy, str]) -> Optional[Location]:
         host = proxy.host if isinstance(proxy, Proxy) else proxy
         try:
             _j_resp = await self.get_api(host=host)
