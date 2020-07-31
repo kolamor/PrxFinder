@@ -14,45 +14,24 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ("TaskHandlerToDB", 'PsqlDb',)
+__all__ = ("TaskHandlerToDB", 'ProxyDb',)
 
 
-class ProxyDb(Proxy):
-    table: Table = proxy_table
+class LocationDb:
     _db: asyncpg.pool.Pool
-
-    def __init__(self, db_connect: asyncpg.pool.Pool, *arg, **kwargs):
-        self._db = db_connect
-        super().__init__(*arg, **kwargs)
-
-    async def init(self, host, port):
-        pass
-
-    async def select_proxy_pm(self, host: str, port: int):
-        """select proxy
-        SELECT * FROM {self.table_proxy} WHERE (host = $1 and port =$2);
-        """
-        async with self._db.acquire() as conn:
-            async with conn.transaction():
-                query = select([self.table]).where(and_(
-                    self.table.c.host == host,
-                    self.table.c.port == port
-                ))
-                res = await conn.fet(query)
-                return res
-
-
-
-class PsqlDb:
-    _db: asyncpg.pool.Pool
-    table_proxy: Table
     table_location: Table
 
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Table,
-                 table_location: Table):
+    def __init__(self):
+        pass
+
+
+class ProxyDb:
+    _db: asyncpg.pool.Pool
+    table_proxy: Table
+
+    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Table):
         self._db = db_connect
         self.table_proxy = table_proxy
-        self.table_location = table_location
 
     async def insert_proxy(self, **kwargs):
         """Insert proxy
@@ -99,10 +78,10 @@ class PsqlDb:
 class TaskHandlerToDB:
 
     incoming_queue: asyncio.Queue
-    psql_db: PsqlDb
+    psql_db: ProxyDb
     _instance_start: Optional[asyncio.Task]
 
-    def __init__(self, incoming_queue: asyncio.Queue, psql_db: PsqlDb):
+    def __init__(self, incoming_queue: asyncio.Queue, psql_db: ProxyDb):
         self.incoming_queue = incoming_queue
         self.psql_db = psql_db
 

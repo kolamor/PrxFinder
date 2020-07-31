@@ -7,7 +7,7 @@ from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
 from src.parse_module.utils import IPPortPatternLine
-from src import ProxyClient, TaskHandlerToDB, PsqlDb, Location, ApiLocation
+from src import ProxyClient, TaskHandlerToDB, ProxyDb, Location, ApiLocation
 from src import ProxyChecker, Proxy, TaskProxyCheckHandler, proxy_table, location_table
 import asyncpgsa
 import asyncpg
@@ -187,7 +187,7 @@ class TestTaskHandlerToDB:
         caplog.set_level(logging.DEBUG)
         queue_in = asyncio.Queue(2)
         proxy = Proxy.create_from_url(proxy)
-        psql_db = PsqlDb(db_connect=db_pool, table_proxy=proxy_table, table_location=location_table)
+        psql_db = ProxyDb(db_connect=db_pool, table_proxy=proxy_table)
         handler = TaskHandlerToDB(incoming_queue=queue_in, psql_db=psql_db)
         await handler.start()
         assert handler.is_running() is True
@@ -211,7 +211,7 @@ class TestProxyDb:
     @pytest.mark.db
     async def test_select(self, proxy, db_pool: asyncpg.pool.Pool):
         proxy = Proxy.create_from_url(url=proxy)
-        proxy_db = PsqlDb(db_connect=db_pool, table_proxy=proxy_table, table_location=location_table)
+        proxy_db = ProxyDb(db_connect=db_pool, table_proxy=proxy_table)
         await proxy_db.insert_proxy(**proxy.as_dict())
         res = await proxy_db.select_proxy_pm(host=proxy.host, port=proxy.port)
         assert res['port'] == proxy.port and str(res['host']) == proxy.host
@@ -225,7 +225,7 @@ class TestProxyDb:
     @pytest.mark.db
     async def test_insert_delete(self, proxy, db_pool: asyncpg.pool.Pool):
         proxy_obj = Proxy.create_from_url(url=proxy)
-        proxy_db = PsqlDb(db_connect=db_pool, table_proxy=proxy_table, table_location=location_table)
+        proxy_db = ProxyDb(db_connect=db_pool, table_proxy=proxy_table)
         await proxy_db.insert_proxy(**proxy_obj.as_dict())
         proxy_2_obj = Proxy.create_from_url(url=proxy)
         proxy_2_obj.login = 'test_3425'

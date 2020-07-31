@@ -3,7 +3,7 @@ import logging
 import sys
 from typing import Optional, Union, Type
 
-from . import ManyRequestAtHourLocationApi
+from .errors import ManyRequestAtHourLocationApi
 from .client import ProxyClient, Proxy, Location
 from abc import ABC, abstractmethod
 import aiohttp
@@ -160,7 +160,6 @@ class TaskProxyCheckHandler(BaseTaskHandler):
 
 class ApiLocation:
     """
-
     template_api_response: dict = {
         "ip":"145.150.154.25",
         "country_code":"RU",
@@ -198,7 +197,7 @@ class ApiLocation:
             _j_resp = await self.get_api(host=host)
         except Exception as e:
             logger.error(f'{e} :: {e.args}')
-            logger.exception()
+            logger.exception(e)
             raise
         if _j_resp:
             location = self._create_location(json_from_api=_j_resp)
