@@ -131,7 +131,7 @@ class TaskProxyCheckHandler(BaseTaskHandler):
         self.max_tasks_semaphore = asyncio.Semaphore(max_tasks)
 
     async def _start(self) -> None:
-        print(f'{self.__class__} starting')
+        print(f'{self.__class__.__name__} starting')
         while True:
             await self.max_tasks_semaphore.acquire()
             proxy = await self.incoming_queue.get()

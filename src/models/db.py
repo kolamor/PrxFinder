@@ -23,6 +23,7 @@ proxy_table = Table(
     Column('login', VARCHAR, nullable=True),
     Column('password', VARCHAR, nullable=True),
     Column('date_creation', DateTime(timezone=False)),
+    Column('date_update', DateTime(timezone=False)),
     Column('scheme', VARCHAR(6)),
     Column('latency', Float, nullable=True),
     Column('is_alive', BOOLEAN, nullable=True),

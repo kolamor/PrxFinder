@@ -156,7 +156,8 @@ class Proxy:
                  scheme: str = 'http',
                  is_alive: Optional[bool] = None,
                  latency: Optional[float] = None,
-                 checked_at: Optional[datetime.datetime] = None
+                 date_update: Optional[datetime.datetime] = None,
+                 date_creation: Optional[datetime.datetime] = None
                  ):
         self.host = host
         self.port = int(port)
@@ -166,7 +167,8 @@ class Proxy:
         self.scheme = scheme
         self.is_alive = is_alive
         self.latency = latency
-        self.checked_at = checked_at
+        self.date_update = date_update
+        self.date_creation = date_creation
 
     def _create_uri(self) -> str:
         host_port = f'{self.host}:{self.port}'

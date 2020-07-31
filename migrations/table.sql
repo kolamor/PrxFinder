@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS proxy(
     login VARCHAR,
     password VARCHAR,
     date_creation timestamp without time zone default (now() at time zone 'utc'),
+    date_update timestamp without time zone,
     scheme VARCHAR(6),
     latency FLOAT,
     anonymous BOOLEAN,

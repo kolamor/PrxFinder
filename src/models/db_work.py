@@ -1,6 +1,7 @@
 import asyncio
 import asyncpg
 import logging
+import datetime
 from typing import Optional
 # from .db import proxy_table, location_table
 from sqlalchemy import Table, select, update, and_, or_, delete
@@ -137,5 +138,32 @@ class TaskHandlerToDB:
 
     def stop(self) -> None:
         self._instance_start.cancel()
+
+
+class SelectorProxyFromDb:
+    """select proxy from db for check and oth"""
+
+    _db: asyncpg.pool.Pool
+    table_proxy: Table
+    delta_minutes: int
+
+    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Table, delta_minutes: int = 60):
+        self._db = db_connect
+        self.table_proxy = table_proxy
+        self.delta_minutes = delta_minutes
+
+    async def select_and_set_proxy_to_process(self):
+        async with self._db.acquire() as conn:
+            async with conn.transaction():
+                query = select(self.table_proxy).where(self.table_proxy.date_update is None)
+                res = await conn.fetchrow(query)
+                if not res:
+                    query = select(self.table_proxy).where(
+                        self.table_proxy.c.date_update < datetime.datetime.utcnow() - datetime.timedelta(
+                            minutes=self.delta_minutes))
+                    res = await conn.fetchrow(query)
+                    if not res:
+                        return res
+                return res
 
 
