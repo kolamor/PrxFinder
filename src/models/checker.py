@@ -1,9 +1,10 @@
 import asyncio
 import logging
 import sys
-from typing import Optional, Union
-from .client import ProxyClient, Proxy
+from typing import Optional, Union, Type
+from .client import ProxyClient, Proxy, Location
 from abc import ABC, abstractmethod
+import aiohttp
 
 if sys.version_info < (3, 7)[:2]:
     from asyncio import ensure_future as create_task
@@ -124,7 +125,7 @@ class TaskProxyCheckHandler(BaseTaskHandler):
         await self.outgoing_queue.put(proxy)
 
 
-class ProxyLocation(BaseTaskHandler):
+class ApiLocation:
     """
 
     template_api_response: dict = {
@@ -142,15 +143,35 @@ class ProxyLocation(BaseTaskHandler):
     """
     template_api_response: dict
     url_api_location: str = 'https://freegeoip.app/json/'
-    db_location = None
-    # http_session:
+    http_session: aiohttp.ClientSession
 
-    async def _start(self) -> None:
-        print('Start check location')
+    def __init__(self, http_session: aiohttp.ClientSession, url_api_location: Optional[str] = None):
+        self.http_session = http_session
+        if url_api_location:
+            self.url_api_location = url_api_location
 
-    async def processing_task(self, proxy: Proxy):
-        pass
+    async def get_api(self, host: str) -> dict:
+        async with self.http_session.get(url=f'{self.url_api_location}{host}') as resp:
+            if resp.status == 200:
+                _json = await resp.json()
+                return _json
+            else:
+                return {}
 
-    async def get_api(self, proxy: Proxy) -> dict:
-        pass
+    async def find_location(self, proxy: Union[Type[Proxy], str]) -> Optional[Location]:
+        host = proxy.host if isinstance(proxy, Proxy) else proxy
+        try:
+            _j_resp = await self.get_api(host=host)
+        except Exception as e:
+            logger.error(f'{e} :: {e.args}')
+            return
+        if _j_resp:
+            location = self._create_location(json_from_api=_j_resp)
+            return location
+
+    def _create_location(self, json_from_api: dict) -> Location:
+        location = Location(**json_from_api)
+        return location
+
+
 

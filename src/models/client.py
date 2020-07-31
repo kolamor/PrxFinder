@@ -137,6 +137,9 @@ class Location:
             context = {k: v for k, v in self.__dict__.items() if k in self.keys}
         return context
 
+    def __repr__(self):
+        return self.as_dict()
+
 
 class Proxy:
     """
