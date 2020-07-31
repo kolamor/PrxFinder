@@ -34,12 +34,14 @@ proxy_table = Table(
 location_table = Table(
     'location', meta,
     Column('ip', INET, primary_key=True),
-    Column('country_name', VARCHAR),
+    Column('country_name', VARCHAR, nullable=True),
     Column('country_code', VARCHAR, nullable=True),
     Column('region_code', nullable=True),
-    Column('city', VARCHAR),
-    Column('time_zone', VARCHAR),
-    Column('latitude', Float),
-    Column('longitude', Float),
-    Column('metro_code', VARCHAR)
+    Column('city', VARCHAR, nullable=True),
+    Column('time_zone', VARCHAR, nullable=True),
+    Column('latitude', Float, nullable=True),
+    Column('longitude', Float, nullable=True),
+    Column('metro_code', VARCHAR, nullable=True),
+    Column('zip_code', Integer, nullable=True),
+    Column('region_name', VARCHAR, nullable=True)
 )

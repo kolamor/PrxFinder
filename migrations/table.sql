@@ -3,11 +3,13 @@ CREATE TABLE IF NOT EXISTS location(
     country_name VARCHAR,
     country_code VARCHAR,
     region_code VARCHAR,
+    region_name VARCHAR,
     city VARCHAR,
     time_zone VARCHAR,
     latitude FLOAT,
     longitude FLOAT,
-    metro_code VARCHAR
+    zip_code INTEGER,
+    metro_code INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS proxy(

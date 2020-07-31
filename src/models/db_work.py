@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import Table, select, update, and_, or_, delete
 from sqlalchemy.dialects.postgresql import insert
 import sys
-from . import Proxy, proxy_table
+from . import Proxy, proxy_table, Location
 if sys.version_info < (3, 7)[:2]:
     from asyncio import ensure_future as create_task
 else:
@@ -14,15 +14,34 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ("TaskHandlerToDB", 'ProxyDb',)
+__all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', )
 
 
 class LocationDb:
     _db: asyncpg.pool.Pool
     table_location: Table
 
-    def __init__(self):
-        pass
+    def __init__(self, db_connect: asyncpg.pool.Pool, table_location: Table):
+        self.table_location = table_location
+        self._db = db_connect
+
+    async def insert_location(self, **kwargs):
+        async with self._db.acquire() as conn:
+            query = insert(self.table_location).values(**kwargs).on_conflict_do_nothing()
+            res = await conn.execute(query)
+            return res
+
+    async def select_pm(self, ip: str):
+        async with self._db.acquire() as conn:
+            query = select([self.table_location]).where(self.table_location.c.ip == ip)
+            res = await conn.fetchrow(query)
+            return res
+
+    async def delete_for_ip(self, ip: str):
+        async with self._db.acquire() as conn:
+            query = delete(self.table_location).where(self.table_location.c.ip == ip)
+            res = await conn.execute(query)
+            return res
 
 
 class ProxyDb:
@@ -78,12 +97,12 @@ class ProxyDb:
 class TaskHandlerToDB:
 
     incoming_queue: asyncio.Queue
-    psql_db: ProxyDb
+    proxy_db: ProxyDb
     _instance_start: Optional[asyncio.Task]
 
-    def __init__(self, incoming_queue: asyncio.Queue, psql_db: ProxyDb):
+    def __init__(self, incoming_queue: asyncio.Queue, proxy_db: ProxyDb):
         self.incoming_queue = incoming_queue
-        self.psql_db = psql_db
+        self.proxy_db = proxy_db
 
     async def start(self) -> None:
         self._instance_start = create_task(self._start())
@@ -103,7 +122,7 @@ class TaskHandlerToDB:
         """save db"""
         try:
             dict_proxy = proxy.as_dict()
-            res = await self.psql_db.insert_proxy(**dict_proxy)
+            res = await self.proxy_db.insert_proxy(**dict_proxy)
             logger.debug(f'{dict_proxy} ::: {res}')
         except Exception as e:
             logger.error(f'{e} ::: {e.args}')

@@ -117,7 +117,7 @@ class Location:
                  time_zone: Optional[str] = None,
                  latitude: Optional[float] = None,
                  longitude: Optional[float] = None,
-                 metro_code: Optional[float] = None
+                 metro_code: Optional[int] = None
                  ):
         self.ip = ip
         self.country_code = country_code
@@ -125,7 +125,7 @@ class Location:
         self.region_code = region_code
         self.region_name = region_name
         self.city = city
-        self.zip_code = zip_code
+        self.zip_code = int(zip_code)
         self.time_zone = time_zone
         self.latitude = latitude
         self.longitude = longitude

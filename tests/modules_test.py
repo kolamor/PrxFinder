@@ -7,12 +7,13 @@ from aiohttp import ClientSession, TCPConnector
 from src.app import create_tcp_connector
 from src.parse_module import request_get, DefaultParse
 from src.parse_module.utils import IPPortPatternLine
-from src import ProxyClient, TaskHandlerToDB, ProxyDb, Location, ApiLocation
+from src import ProxyClient, TaskHandlerToDB, ProxyDb, Location, ApiLocation, LocationDb
 from src import ProxyChecker, Proxy, TaskProxyCheckHandler, proxy_table, location_table
 import asyncpgsa
 import asyncpg
 import sqlalchemy
 import yaml
+from ipaddress import IPv4Address
 
 
 @pytest.mark.asyncio
@@ -188,7 +189,7 @@ class TestTaskHandlerToDB:
         queue_in = asyncio.Queue(2)
         proxy = Proxy.create_from_url(proxy)
         psql_db = ProxyDb(db_connect=db_pool, table_proxy=proxy_table)
-        handler = TaskHandlerToDB(incoming_queue=queue_in, psql_db=psql_db)
+        handler = TaskHandlerToDB(incoming_queue=queue_in, proxy_db=psql_db)
         await handler.start()
         assert handler.is_running() is True
         clear_test_data = self.clear_test_data(db_pool, proxy)
@@ -249,3 +250,29 @@ class TestApiLocation:
         assert isinstance(location, Location)
         for loc in location.keys:
             assert loc in location.as_dict()
+
+
+class TestLocationDb:
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.asyncio
+    @pytest.mark.db
+    async def test_db(self, db_pool: asyncpg.pool.Pool):
+        _location = {'ip': '11.111.111.111', 'country_code': 'US', 'country_name': 'United States', 'region_code': 'VA',
+                     'region_name': 'Virginia', 'city': 'Boydton', 'zip_code': 23917, 'time_zone': 'America/New_York',
+                     'latitude': 36.6534, 'longitude': -78.375, 'metro_code': 560}
+        location_db = LocationDb(db_connect=db_pool, table_location=location_table)
+        lc = await location_db.select_pm(ip=_location['ip'])
+        if lc:
+            await location_db.delete_for_ip(ip=_location['ip'])
+        await location_db.insert_location(**_location)
+        lc = await location_db.select_pm(ip=_location['ip'])
+        for k, v in _location.items():
+            if isinstance(lc[k], IPv4Address):
+                assert str(lc[k]) == v
+            else:
+                assert lc[k] == v
+        await location_db.delete_for_ip(ip=_location['ip'])
+        res = await location_db.select_pm(ip=_location['ip'])
+        assert res is None
+
+
