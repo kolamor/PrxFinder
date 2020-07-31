@@ -2,6 +2,8 @@ import asyncio
 import logging
 import sys
 from typing import Optional, Union, Type
+
+from . import ManyRequestAtHourLocationApi
 from .client import ProxyClient, Proxy, Location
 from abc import ABC, abstractmethod
 import aiohttp
@@ -35,6 +37,37 @@ class BaseTaskHandler(ABC):
     async def _start(self) -> None:
         pass
 
+
+class BasePipelineTask(ABC):
+    incoming_queue: asyncio.Queue
+    outgoing_queue: asyncio.Queue
+    max_tasks_semaphore: asyncio.Semaphore
+
+    def __init__(self, incoming_queue: asyncio.Queue, outgoing_queue: asyncio.Queue, max_tasks: int = 20):
+        self.incoming_queue = incoming_queue
+        self.outgoing_queue = outgoing_queue
+        self.max_tasks_semaphore = asyncio.Semaphore(max_tasks)
+
+    async def _start(self) -> None:
+        print(f'{self.__class__} starting')
+        while True:
+            await self.max_tasks_semaphore.acquire()
+            proxy = await self.incoming_queue.get()
+            self.incoming_queue.task_done()
+            if not isinstance(proxy, Proxy):
+                logger.error(f'{proxy} -- not instance Proxy')
+                self.max_tasks_semaphore.release()
+                continue
+            create_task(self.processing_task(proxy))
+            await asyncio.sleep(0)
+
+    async def put_proxy_to_queue(self, proxy: Proxy) -> None:
+        await self.outgoing_queue.put(proxy)
+
+    @abstractmethod
+    async def processing_task(self, proxy: Proxy):
+        self.max_tasks_semaphore.release()
+        pass
 
 
 
@@ -155,6 +188,8 @@ class ApiLocation:
             if resp.status == 200:
                 _json = await resp.json()
                 return _json
+            elif resp.status == 403:
+                raise ManyRequestAtHourLocationApi()
             return
 
     async def find_location(self, proxy: Union[Proxy, str]) -> Optional[Location]:
@@ -163,7 +198,8 @@ class ApiLocation:
             _j_resp = await self.get_api(host=host)
         except Exception as e:
             logger.error(f'{e} :: {e.args}')
-            return
+            logger.exception()
+            raise
         if _j_resp:
             location = self._create_location(json_from_api=_j_resp)
             return location
@@ -171,6 +207,33 @@ class ApiLocation:
     def _create_location(self, json_from_api: dict) -> Location:
         location = Location(**json_from_api)
         return location
+
+
+class LocationTaskHandler(BasePipelineTask, BaseTaskHandler):
+    api_location: ApiLocation
+
+    def __init__(self, api_location, *args, **kwargs):
+        """You're allowed up to 15,000 queries per hour by default.
+         Once this limit is reached, all of your requests will result in HTTP 403, forbidden,
+          until your quota is cleared.
+          15000
+          """
+        super().__init__(*args, **kwargs)
+        self.api_location = api_location
+
+    async def processing_task(self, proxy: Proxy) -> None:
+        try:
+            location = await self.api_location.find_location(proxy=proxy)
+            if isinstance(location, Location):
+                proxy.location = location
+        except Exception as e:
+            logger.error(f"{e} :: {e.args}")
+        try:
+            await self.put_proxy_to_queue(proxy=proxy)
+            self.max_tasks_semaphore.release()
+        except Exception as e:
+            logger.error(e)
+            logger.exception(e)
 
 
 

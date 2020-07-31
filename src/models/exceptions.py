@@ -1,0 +1,2 @@
+class ManyRequestAtHourLocationApi(Exception):
+    pass
