@@ -5,6 +5,7 @@ from typing import Optional, Union, Type
 
 from .errors import ManyRequestAtHourLocationApi
 from .client import ProxyClient, Proxy, Location
+from .db_work import LocationDb
 from abc import ABC, abstractmethod
 import aiohttp
 
@@ -15,7 +16,8 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTaskHandler', 'BasePipelineTask','ApiLocation')
+__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTaskHandler', 'BasePipelineTask',
+           'ApiLocation', 'LocationTaskHandler')
 
 
 class BaseTaskHandler(ABC):
@@ -210,8 +212,9 @@ class ApiLocation:
 
 class LocationTaskHandler(BasePipelineTask, BaseTaskHandler):
     api_location: ApiLocation
+    location_db: LocationDb
 
-    def __init__(self, api_location, *args, **kwargs):
+    def __init__(self, api_location: ApiLocation, location_db: LocationDb, *args, **kwargs):
         """You're allowed up to 15,000 queries per hour by default.
          Once this limit is reached, all of your requests will result in HTTP 403, forbidden,
           until your quota is cleared.
@@ -219,20 +222,46 @@ class LocationTaskHandler(BasePipelineTask, BaseTaskHandler):
           """
         super().__init__(*args, **kwargs)
         self.api_location = api_location
+        self.location_db = location_db
 
     async def processing_task(self, proxy: Proxy) -> None:
         try:
-            location = await self.api_location.find_location(proxy=proxy)
-            if isinstance(location, Location):
-                proxy.location = location
+            location = self.select_from_db(proxy.host)
+            if not location:
+                location = await self.api_location.find_location(proxy=proxy)
+                if isinstance(location, Location):
+                    proxy.location = location
+                    await self.save_location_from_db(location=location)
         except Exception as e:
             logger.error(f"{e} :: {e.args}")
+
         try:
             await self.put_proxy_to_queue(proxy=proxy)
-            self.max_tasks_semaphore.release()
         except Exception as e:
             logger.error(e)
             logger.exception(e)
+        finally:
+            self.max_tasks_semaphore.release()
+
+    async def exist_location_from_db(self, ip: str):
+        exist = await self.location_db.exist(ip=ip)
+        return exist
+
+    def _create_location(self, row: dict) -> Location:
+        location = Location(**row)
+        return location
+
+    async def select_from_db(self, ip: str) -> Optional[Location]:
+        row = await self.location_db.select_pm(ip=ip)
+        if row:
+            row = {k: v for k, v in row.items()}
+            return self._create_location(row)
+        return row
+
+    async def save_location_from_db(self, location: Location):
+        await self.location_db.insert_location(**location.as_dict())
+
+
 
 
 

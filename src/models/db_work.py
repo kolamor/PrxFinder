@@ -3,9 +3,9 @@ import asyncpg
 import logging
 import datetime
 from typing import Optional
-from .checker import BaseTaskHandler
+# from .checker import BaseTaskHandler
 from .db import proxy_table, location_table
-from sqlalchemy import Table, select, update, and_, or_, delete
+from sqlalchemy import Table, select, update, and_, or_, delete, exists
 from sqlalchemy.dialects.postgresql import insert
 import sys
 from . import Proxy
@@ -43,6 +43,12 @@ class LocationDb:
     async def delete_for_ip(self, ip: str):
         async with self._db.acquire() as conn:
             query = delete(self.table_location).where(self.table_location.c.ip == ip)
+            res = await conn.execute(query)
+            return res
+
+    async def exist(self, ip: str) -> bool:
+        async with self._db.acquire() as conn:
+            query = exists(self.table_location).where(self.table_location.c.ip == ip)
             res = await conn.execute(query)
             return res
 
@@ -179,7 +185,7 @@ class TaskHandlerToDB:
         self._instance_start.cancel()
 
 
-class StartProxyHandler(BaseTaskHandler):
+class StartProxyHandler(TaskHandlerToDB):
     proxy_db: ProxyDb
     outgoing_queue: asyncio.Queue
     max_tasks_semaphore: asyncio.Semaphore

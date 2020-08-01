@@ -23,20 +23,19 @@ async def create_app(config: dict) -> aiohttp.web.Application:
 async def on_start(app):
     config = app['config']
     tcp_config = {}
-    app['http_client'] = aiohttp.ClientSession(connector=create_tcp_connector(tcp_config))
+    app['http_client'] = ClientSession(connector=create_tcp_connector(tcp_config))
     db_connect_kwargs = {}
-    app['db'] = await asyncpgsa.create_pool(dsn=config['POSTGRESQL_URI'], **db_connect_kwargs)
+    app['asyncpgsa_db_pool'] = await asyncpgsa.create_pool(dsn=config['POSTGRESQL_URI'], **db_connect_kwargs)
     app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['proxy_save_db_queue'] = asyncio.Queue()
-    app['proxy_to_db'] = src.ProxyDb(db_connect=app['db'], table_proxy=src.proxy_table,
-                                     table_location=src.location_table)
+    # app['proxy_to_db'] = src.ProxyDb(db_connect=app['db'], table_proxy=src.proxy_table)
     await start_check_proxy(app=app, config=config)
 
 
 async def on_shutdown(app):
     logger.info('on_shutdown')
-    await app['db'].close()
+    await app['asyncpgsa_db_pool'].close()
     logger.info('PSQL closed')
     await app['http_client'].close()
     logger.info('http_client closed')
@@ -57,7 +56,7 @@ def create_tcp_connector(config: dict) -> TCPConnector:
     return connector
 
 
-async def start_check_proxy(app: aiohttp.web.Application , config: dict):
+async def start_check_proxy(app: aiohttp.web.Application, config: dict):
     if config.get('start_check_proxy', True) is True:
         handler = src.TaskProxyCheckHandler(incoming_queue=app['in_checker_queue'],
                                             outgoing_queue=app['out_checker_queue'],
@@ -66,3 +65,39 @@ async def start_check_proxy(app: aiohttp.web.Application , config: dict):
         app['proxy_check_handler'] = handler
         print('Start proxy_check_handler')
         return
+
+
+async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: dict):
+    db = app['asyncpgsa_db_pool']
+    proxy_db = src.ProxyDb(db_connect=db, table_proxy=src.proxy_table)
+    queue_api_to_db = app['queue_api_to_db'] = asyncio.Queue()
+    task_handler_api_to_db = app['task_handler_api_to_db'] = src.TaskHandlerToDB(incoming_queue=queue_api_to_db,
+                                                                                 proxy_db=proxy_db)
+    await task_handler_api_to_db.start()
+
+    start_proxy_queue = app['start_proxy_queue'] = asyncio.Queue(1)
+    start_proxy_handler = app['start_proxy_handler'] = src.StartProxyHandler(proxy_db=proxy_db,
+                                                                             outgoing_queue=start_proxy_queue)
+    await start_proxy_handler.start()
+
+    checker_out_queue = app['checker_out_queue'] = asyncio.Queue()
+    checker_handler = app['checker_handler'] = src.TaskProxyCheckHandler(incoming_queue=start_proxy_queue,
+                                                                         outgoing_queue=checker_out_queue,
+                                                                         max_tasks=20)
+    await checker_handler.start()
+
+    api_location = src.ApiLocation(app['http_client'])
+    location_db = src.LocationDb(db_connect=db, table_location=src.location_table)
+    location_handler = app['location_handler'] = src.LocationTaskHandler(api_location=api_location,
+                                                                         location_db=location_db,
+                                                                         incoming_queue=checker_out_queue,
+                                                                         outgoing_queue=checker_out_queue, max_tasks=20)
+    await location_handler.start()
+
+
+
+
+
+
+
+
