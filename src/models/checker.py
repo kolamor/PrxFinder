@@ -15,7 +15,7 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTaskHandler', 'ApiLocation')
+__all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTaskHandler', 'BasePipelineTask','ApiLocation')
 
 
 class BaseTaskHandler(ABC):
@@ -125,7 +125,7 @@ class TaskProxyCheckHandler(BaseTaskHandler):
     max_tasks_semaphore: asyncio.Semaphore
     _instance_start: Optional[asyncio.Task]
 
-    def __init__(self, incoming_queue: asyncio.Queue, outgoing_queue: asyncio.Queue, max_tasks: int = 20):
+    def __init__(self, outgoing_queue: asyncio.Queue, incoming_queue: Optional[asyncio.Queue] = None, max_tasks: int = 20):
         self.incoming_queue = incoming_queue
         self.outgoing_queue = outgoing_queue
         self.max_tasks_semaphore = asyncio.Semaphore(max_tasks)

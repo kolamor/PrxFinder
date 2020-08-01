@@ -3,11 +3,12 @@ import asyncpg
 import logging
 import datetime
 from typing import Optional
-# from .db import proxy_table, location_table
-from sqlalchemy import Table, select, update, and_, or_, delete, null
+from .checker import BaseTaskHandler
+from .db import proxy_table, location_table
+from sqlalchemy import Table, select, update, and_, or_, delete
 from sqlalchemy.dialects.postgresql import insert
 import sys
-from . import Proxy, proxy_table, Location
+from . import Proxy
 if sys.version_info < (3, 7)[:2]:
     from asyncio import ensure_future as create_task
 else:
@@ -15,15 +16,16 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', )
+__all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', 'StartProxyHandler')
 
 
 class LocationDb:
     _db: asyncpg.pool.Pool
-    table_location: Table
+    table_location: Table = location_table
 
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_location: Table):
-        self.table_location = table_location
+    def __init__(self, db_connect: asyncpg.pool.Pool, table_location: Optional[Table] = None):
+        if table_location is not None:
+            self.table_location = table_location
         self._db = db_connect
 
     async def insert_location(self, **kwargs):
@@ -47,12 +49,15 @@ class LocationDb:
 
 class ProxyDb:
     _db: asyncpg.pool.Pool
-    table_proxy: Table
-    delta_minutes: int = 60
+    table_proxy: Table = location_table
+    delta_minutes_for_check: int
 
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Table):
+    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Optional[Table] = None,
+                 delta_minutes_for_check: int = 60):
         self._db = db_connect
-        self.table_proxy = table_proxy
+        if table_proxy is not None:
+            self.table_proxy = table_proxy
+        self.delta_minutes_for_check = delta_minutes_for_check
 
     async def insert_proxy(self, **kwargs):
         """Insert proxy
@@ -114,7 +119,7 @@ class ProxyDb:
                     query = select([self.table_proxy]).where(
                         and_(
                             self.table_proxy.c.date_update < datetime.datetime.utcnow() - datetime.timedelta(
-                                minutes=self.delta_minutes),
+                                minutes=self.delta_minutes_for_check),
                             self.table_proxy.c.in_process == False)) # noqa
                     res = await conn.fetchrow(query)
                 if res:
@@ -173,3 +178,42 @@ class TaskHandlerToDB:
     def stop(self) -> None:
         self._instance_start.cancel()
 
+
+class StartProxyHandler(BaseTaskHandler):
+    proxy_db: ProxyDb
+    outgoing_queue: asyncio.Queue
+    max_tasks_semaphore: asyncio.Semaphore
+
+    def __init__(self, outgoing_queue: asyncio.Queue, proxy_db: ProxyDb, max_tasks: int = 20):
+        self.proxy_db = proxy_db
+        self.outgoing_queue = outgoing_queue
+        self.max_tasks_semaphore = asyncio.Semaphore(max_tasks)
+
+    async def _start(self) -> None:
+        logger.info(f'{self.__class__.__name__} starting')
+        while True:
+            try:
+                proxy = await self.get_proxy()
+                if not proxy:
+                    await asyncio.sleep(1)
+                    continue
+            except Exception as e:
+                logger.error(f"{self.__class__.__name__} {e}, {e.args}")
+                logger.exception(e)
+                continue
+            try:
+                await self.put_proxy_to_queue(proxy)
+            except Exception as e:
+                logger.error(f"{self.__class__.__name__} {e}, {e.args}")
+                logger.exception(e)
+            await asyncio.sleep(0)
+
+    async def put_proxy_to_queue(self, proxy: Proxy) -> None:
+        await self.outgoing_queue.put(proxy)
+
+    async def get_proxy(self) -> Optional[Proxy]:
+        row = await self.proxy_db.select_and_set_proxy_to_process()
+        if not row:
+            return
+        proxy = Proxy(**{k: v for k, v in row.items()})
+        return proxy
