@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+
 import aiohttp
 import pytest
 import os
@@ -220,6 +222,7 @@ class TestProxyDb:
             query = sqlalchemy.text('delete from proxy where (host = $1 and port = $2)')
             res = await conn.execute(query, proxy.host, proxy.port)
 
+
     @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
@@ -237,6 +240,39 @@ class TestProxyDb:
         await proxy_db.delete_proxy_pm(host=proxy_2_obj.host, port=proxy_2_obj.port)
         res = await proxy_db.select_proxy_pm(host=proxy_2_obj.host, port=proxy_2_obj.port)
         assert res is None
+
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    @pytest.mark.db
+    async def test_select_and_set_proxy_to_process(self, proxy, db_pool):
+        proxy_obj = Proxy.create_from_url(url=proxy)
+        proxy_db = ProxyDb(db_connect=db_pool, table_proxy=proxy_table)
+        await proxy_db.insert_proxy(**proxy_obj.as_dict())
+        res = await proxy_db.select_and_set_proxy_to_process()
+        for k, v in proxy_obj.as_dict().items():
+            assert str(res[k]) == str(v)
+        assert res['in_process'] is False
+        res = await proxy_db.select_proxy_pm(host=proxy_obj.host, port=proxy_obj.port)
+        assert res['in_process'] is True
+        await proxy_db.delete_proxy_pm(host=proxy_obj.host, port=proxy_obj.port)
+
+    @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
+    @pytest.mark.parametrize('proxy', load_proxy_from_file())
+    @pytest.mark.asyncio
+    @pytest.mark.db
+    async def test_select_and_set_proxy_to_process_2(self, proxy, db_pool):
+        proxy_obj = Proxy.create_from_url(url=proxy)
+        proxy_obj.date_update = datetime.datetime.utcnow() - datetime.timedelta(minutes=61)
+        proxy_db = ProxyDb(db_connect=db_pool, table_proxy=proxy_table)
+        await proxy_db.insert_proxy(**proxy_obj.as_dict())
+        res = await proxy_db.select_and_set_proxy_to_process()
+        for k, v in proxy_obj.as_dict().items():
+            assert str(res[k]) == str(v)
+        assert res['in_process'] is False
+        res = await proxy_db.select_proxy_pm(host=proxy_obj.host, port=proxy_obj.port)
+        assert res['in_process'] is True
+        await proxy_db.delete_proxy_pm(host=proxy_obj.host, port=proxy_obj.port)
 
 
 class TestApiLocation:
@@ -274,5 +310,4 @@ class TestLocationDb:
         await location_db.delete_for_ip(ip=_location['ip'])
         res = await location_db.select_pm(ip=_location['ip'])
         assert res is None
-
 

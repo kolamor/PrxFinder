@@ -23,6 +23,6 @@ CREATE TABLE IF NOT EXISTS proxy(
     latency FLOAT,
     anonymous BOOLEAN,
     is_alive BOOLEAN,
-    in_process BOOLEAN,
+    in_process BOOLEAN DEFAULT FALSE,
     CONSTRAINT c_host_port PRIMARY KEY(host, port)
 );

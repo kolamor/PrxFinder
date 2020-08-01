@@ -194,7 +194,7 @@ class Proxy:
         return self._create_uri()
 
     def as_dict(self) -> dict:
-        keys = ('host', 'port', 'login', 'password', 'latency', 'is_alive', 'scheme', )
+        keys = ('host', 'port', 'login', 'password', 'latency', 'is_alive', 'scheme', 'date_update', 'date_creation')
         context = {k: v for k, v in self.__dict__ .items() if k in keys}
         return context
 

@@ -17,7 +17,6 @@ meta = MetaData()
 # Model table Proxy
 proxy_table = Table(
     'proxy', meta,
-    # Column('host', VARCHAR),
     Column('host', INET, nullable=False),
     Column('port', Integer),
     Column('login', VARCHAR, nullable=True),
@@ -28,6 +27,7 @@ proxy_table = Table(
     Column('latency', Float, nullable=True),
     Column('is_alive', BOOLEAN, nullable=True),
     Column('anonymous', BOOLEAN, nullable=True),
+    Column('in_process', BOOLEAN, default=False),
     UniqueConstraint('host', 'port', name='unique_host_port'),
 )
 

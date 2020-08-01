@@ -4,7 +4,7 @@ import logging
 import datetime
 from typing import Optional
 # from .db import proxy_table, location_table
-from sqlalchemy import Table, select, update, and_, or_, delete
+from sqlalchemy import Table, select, update, and_, or_, delete, null
 from sqlalchemy.dialects.postgresql import insert
 import sys
 from . import Proxy, proxy_table, Location
@@ -48,6 +48,7 @@ class LocationDb:
 class ProxyDb:
     _db: asyncpg.pool.Pool
     table_proxy: Table
+    delta_minutes: int = 60
 
     def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Table):
         self._db = db_connect
@@ -94,6 +95,39 @@ class ProxyDb:
             res = await conn.execute(query)
         return res
 
+    async def select_and_set_proxy_to_process(self):
+        """
+        BEGIN;
+        (SELECT * FROM proxy WHERE proxy.date_update IS NULL AND proxy.in_process = false) as q1
+        IF NOT EXIST q1 (SELECT * FROM proxy WHERE proxy.date_update < :date_update_1 AND proxy.in_process = false) as q2
+        IF EXIST q1 OR q2(
+        UPDATE proxy SET in_process=:in_process WHERE proxy.host = :host_1 AND proxy.port = :port_1);
+        COMMIT;
+        :return:
+        """
+        async with self._db.acquire() as conn:
+            async with conn.transaction():
+                query = select([self.table_proxy]).where(
+                    and_(self.table_proxy.c.date_update == None, self.table_proxy.c.in_process == False)) # noqa
+                res = await conn.fetchrow(query)
+                if not res:
+                    query = select([self.table_proxy]).where(
+                        and_(
+                            self.table_proxy.c.date_update < datetime.datetime.utcnow() - datetime.timedelta(
+                                minutes=self.delta_minutes),
+                            self.table_proxy.c.in_process == False)) # noqa
+                    res = await conn.fetchrow(query)
+                if res:
+                    query_update = update(self.table_proxy).where(
+                        and_(
+                            self.table_proxy.c.host == res['host'],
+                            self.table_proxy.c.port == res['port']
+                        )
+                    ).values({"in_process": True})
+                    update_result = await conn.execute(query_update)
+                    return res
+        return res
+
 
 class TaskHandlerToDB:
 
@@ -138,32 +172,4 @@ class TaskHandlerToDB:
 
     def stop(self) -> None:
         self._instance_start.cancel()
-
-
-class SelectorProxyFromDb:
-    """select proxy from db for check and oth"""
-
-    _db: asyncpg.pool.Pool
-    table_proxy: Table
-    delta_minutes: int
-
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Table, delta_minutes: int = 60):
-        self._db = db_connect
-        self.table_proxy = table_proxy
-        self.delta_minutes = delta_minutes
-
-    async def select_and_set_proxy_to_process(self):
-        async with self._db.acquire() as conn:
-            async with conn.transaction():
-                query = select(self.table_proxy).where(self.table_proxy.date_update is None)
-                res = await conn.fetchrow(query)
-                if not res:
-                    query = select(self.table_proxy).where(
-                        self.table_proxy.c.date_update < datetime.datetime.utcnow() - datetime.timedelta(
-                            minutes=self.delta_minutes))
-                    res = await conn.fetchrow(query)
-                    if not res:
-                        return res
-                return res
-
 
