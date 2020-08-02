@@ -29,5 +29,5 @@ if args.reload:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=getattr(logging, config.get('logging_level', 'DEBUG')))
+    logging.basicConfig(level=getattr(logging, config.get('LOGGING_LEVEL', 'DEBUG')))
     aiohttp.web.run_app(app, host=args.host, port=args.port)

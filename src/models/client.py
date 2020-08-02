@@ -29,6 +29,15 @@ def latency(coro):
     return wrapped
 
 
+def date_update(coro):
+    """wrapper -  approximately time read response, adds latency to returned dict"""
+    async def wrapped(*args, **kwargs):
+        result = await coro(*args, **kwargs)
+        result.update({'date_update': datetime.datetime.utcnow()})
+        return result
+    return wrapped
+
+
 class ProxyClient:
     """Support http(s), socks(4,5) proxy
      Use
@@ -69,7 +78,9 @@ class ProxyClient:
     async def close(self) -> None:
         await self._session.close()
 
+
     @latency
+    @date_update
     async def get(self, url: Optional[str] = None) -> dict:
         """ get request from url or self.test_url,
         context =  {'url': type[str],
@@ -157,7 +168,9 @@ class Proxy:
                  is_alive: Optional[bool] = None,
                  latency: Optional[float] = None,
                  date_update: Optional[datetime.datetime] = None,
-                 date_creation: Optional[datetime.datetime] = None
+                 date_creation: Optional[datetime.datetime] = None,
+                 anonymous: Optional[bool] = None,
+                 in_process: Optional[bool] = None
                  ):
         self.host = host
         self.port = int(port)
@@ -169,6 +182,8 @@ class Proxy:
         self.latency = latency
         self.date_update = date_update
         self.date_creation = date_creation
+        self.anonymous = anonymous
+        self.in_process = in_process
 
     def _create_uri(self) -> str:
         host_port = f'{self.host}:{self.port}'
@@ -194,7 +209,8 @@ class Proxy:
         return self._create_uri()
 
     def as_dict(self) -> dict:
-        keys = ('host', 'port', 'login', 'password', 'latency', 'is_alive', 'scheme', 'date_update', 'date_creation')
+        keys = ('host', 'port', 'login', 'password', 'latency', 'is_alive', 'scheme', 'date_update', 'date_creation',
+                'anonymous', 'in_process', )
         context = {k: v for k, v in self.__dict__ .items() if k in keys}
         return context
 

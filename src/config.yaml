@@ -1,4 +1,4 @@
 # Default configuration file
 test: test
-LOG_LEVEL: INFO
+LOGGING_LEVEL: INFO
 POSTGRESQL_URI: postgresql://user:pass@localhost:5432/test

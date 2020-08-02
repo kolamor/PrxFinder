@@ -5,8 +5,9 @@ import datetime
 from typing import Optional
 # from .checker import BaseTaskHandler
 from .db import proxy_table, location_table
-from sqlalchemy import Table, select, update, and_, or_, delete, exists
+from sqlalchemy import Table, select, update, and_, or_, delete, exists, text
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects import postgresql
 import sys
 from . import Proxy
 if sys.version_info < (3, 7)[:2]:
@@ -46,11 +47,16 @@ class LocationDb:
             res = await conn.execute(query)
             return res
 
-    async def exist(self, ip: str) -> bool:
+    async def exist_ip(self, ip: str) -> bool:
         async with self._db.acquire() as conn:
-            query = exists(self.table_location).where(self.table_location.c.ip == ip)
-            res = await conn.execute(query)
-            return res
+
+            # query = exists(select([self.table_location.c.ip]).where(self.table_location.c.ip == ip))
+
+            query = text(f'''SELECT exists (SELECT {self.table_location.c.ip}
+                                FROM {self.table_location}
+                                WHERE {self.table_location.c.ip} = $1) as "exists";''')
+            res = await conn.fetchrow(query, ip)
+            return res['exists']
 
 
 class ProxyDb:
@@ -168,7 +174,15 @@ class TaskHandlerToDB:
         """save db"""
         try:
             dict_proxy = proxy.as_dict()
-            res = await self.proxy_db.insert_proxy(**dict_proxy)
+            if dict_proxy.get('in_process', False):
+                proxy.in_process = False
+                dict_proxy.update({"in_process": False})
+                res = await self.proxy_db.update_proxy_pm(**dict_proxy)
+                logger.debug(f'{dict_proxy} ::: {res}')
+            else:
+                # db auto set date_creation
+                dict_proxy.pop('date_creation')
+                res = await self.proxy_db.insert_proxy(**dict_proxy)
             logger.debug(f'{dict_proxy} ::: {res}')
         except Exception as e:
             logger.error(f'{e} ::: {e.args}')
@@ -203,6 +217,8 @@ class StartProxyHandler(TaskHandlerToDB):
                 if not proxy:
                     await asyncio.sleep(1)
                     continue
+                print(proxy)
+                proxy.in_process = True
             except Exception as e:
                 logger.error(f"{self.__class__.__name__} {e}, {e.args}")
                 logger.exception(e)

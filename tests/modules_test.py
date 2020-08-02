@@ -95,6 +95,7 @@ class TestClient:
         assert sess.closed is True
 
    # TODO create functions tests
+
     @pytest.mark.skipif(bool(os.environ.get('CI_TEST', False)) is False, reason='CI skip')
     @pytest.mark.parametrize('proxy', load_proxy_from_file())
     @pytest.mark.asyncio
@@ -297,7 +298,7 @@ class TestLocationDb:
                      'region_name': 'Virginia', 'city': 'Boydton', 'zip_code': 23917, 'time_zone': 'America/New_York',
                      'latitude': 36.6534, 'longitude': -78.375, 'metro_code': 560}
         location_db = LocationDb(db_connect=db_pool, table_location=location_table)
-        lc = await location_db.select_pm(ip=_location['ip'])
+        lc = await location_db.exist_ip(ip=_location['ip'])
         if lc:
             await location_db.delete_for_ip(ip=_location['ip'])
         await location_db.insert_location(**_location)
@@ -308,6 +309,15 @@ class TestLocationDb:
             else:
                 assert lc[k] == v
         await location_db.delete_for_ip(ip=_location['ip'])
-        res = await location_db.select_pm(ip=_location['ip'])
-        assert res is None
+        res = await location_db.exist_ip(ip=_location['ip'])
+        assert res is False
+
+
+class TestLocationTaskHandler:
+    pass
+
+
+
+
+
 

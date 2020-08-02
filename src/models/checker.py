@@ -106,6 +106,7 @@ class ProxyChecker:
 
     def rebuild_proxy(self, answer: dict) -> None:
         self.proxy.latency = float(round(answer['latency'], 2))
+        self.proxy.date_update = answer['date_update']
         self.proxy.is_alive = True
 
     def check_policy(self, data: dict) -> bool:
@@ -226,12 +227,12 @@ class LocationTaskHandler(BasePipelineTask, BaseTaskHandler):
 
     async def processing_task(self, proxy: Proxy) -> None:
         try:
-            location = self.select_from_db(proxy.host)
+            location = await self.select_from_db(proxy.host)
             if not location:
                 location = await self.api_location.find_location(proxy=proxy)
                 if isinstance(location, Location):
-                    proxy.location = location
                     await self.save_location_from_db(location=location)
+            proxy.location = location
         except Exception as e:
             logger.error(f"{e} :: {e.args}")
 
@@ -244,7 +245,7 @@ class LocationTaskHandler(BasePipelineTask, BaseTaskHandler):
             self.max_tasks_semaphore.release()
 
     async def exist_location_from_db(self, ip: str):
-        exist = await self.location_db.exist(ip=ip)
+        exist = await self.location_db.exist_ip(ip=ip)
         return exist
 
     def _create_location(self, row: dict) -> Location:

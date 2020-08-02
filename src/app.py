@@ -28,8 +28,6 @@ async def on_start(app):
     app['asyncpgsa_db_pool'] = await asyncpgsa.create_pool(dsn=config['POSTGRESQL_URI'], **db_connect_kwargs)
     app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
-    app['proxy_save_db_queue'] = asyncio.Queue()
-    # app['proxy_to_db'] = src.ProxyDb(db_connect=app['db'], table_proxy=src.proxy_table)
     await start_check_proxy(app=app, config=config)
 
 
@@ -58,11 +56,7 @@ def create_tcp_connector(config: dict) -> TCPConnector:
 
 async def start_check_proxy(app: aiohttp.web.Application, config: dict):
     if config.get('start_check_proxy', True) is True:
-        handler = src.TaskProxyCheckHandler(incoming_queue=app['in_checker_queue'],
-                                            outgoing_queue=app['out_checker_queue'],
-                                            max_tasks=config.get('limit_check_proxy', 50))
-        await handler.start()
-        app['proxy_check_handler'] = handler
+        await create_task_handlers_api_to_db(app=app, config=config)
         print('Start proxy_check_handler')
         return
 
@@ -91,7 +85,7 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
     location_handler = app['location_handler'] = src.LocationTaskHandler(api_location=api_location,
                                                                          location_db=location_db,
                                                                          incoming_queue=checker_out_queue,
-                                                                         outgoing_queue=checker_out_queue, max_tasks=20)
+                                                                         outgoing_queue=queue_api_to_db, max_tasks=20)
     await location_handler.start()
 
 
