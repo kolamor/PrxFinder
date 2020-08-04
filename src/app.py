@@ -4,6 +4,7 @@ import asyncio
 import logging
 from aiohttp import web, ClientSession, TCPConnector
 import src
+from .parse_module.free_proxy import Sslproxies24_top
 from .routes import setup_routes
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,11 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
                                                                          incoming_queue=checker_out_queue,
                                                                          outgoing_queue=queue_api_to_db, max_tasks=20)
     await location_handler.start()
+
+    #  start parse
+
+    ssl_proxies = Sslproxies24_top(client_session=app['http_client'], out_queue=queue_api_to_db)
+    await ssl_proxies.parse()
 
 
 
