@@ -78,7 +78,7 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
     checker_out_queue = app['checker_out_queue'] = asyncio.Queue()
     checker_handler = app['checker_handler'] = src.TaskProxyCheckHandler(incoming_queue=start_proxy_queue,
                                                                          outgoing_queue=checker_out_queue,
-                                                                         max_tasks=20)
+                                                                         max_tasks=100)
     await checker_handler.start()
 
     api_location = src.ApiLocation(app['http_client'])

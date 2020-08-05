@@ -18,6 +18,8 @@ import yaml
 from ipaddress import IPv4Address
 
 
+# TODO create temp table
+
 @pytest.mark.asyncio
 async def test_create_tcp_connector():
     tcp_conn = create_tcp_connector({})
@@ -295,7 +297,7 @@ class TestLocationDb:
     @pytest.mark.db
     async def test_db(self, db_pool: asyncpg.pool.Pool):
         _location = {'ip': '11.111.111.111', 'country_code': 'US', 'country_name': 'United States', 'region_code': 'VA',
-                     'region_name': 'Virginia', 'city': 'Boydton', 'zip_code': 23917, 'time_zone': 'America/New_York',
+                     'region_name': 'Virginia', 'city': 'Boydton', 'zip_code': '23917', 'time_zone': 'America/New_York',
                      'latitude': 36.6534, 'longitude': -78.375, 'metro_code': 560}
         location_db = LocationDb(db_connect=db_pool, table_location=location_table)
         lc = await location_db.exist_ip(ip=_location['ip'])

@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import sys
+import datetime
 from typing import Optional, Union, Type
-
+import weakref
 from .errors import ManyRequestAtHourLocationApi
 from .client import ProxyClient, Proxy, Location
 from .db_work import LocationDb
@@ -22,6 +23,7 @@ __all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTas
 
 class BaseTaskHandler(ABC):
     _instance_start: Optional[asyncio.Task] = None
+    reference_tasks: list = []
 
     async def start(self) -> None:
         self._instance_start = create_task(self._start())
@@ -44,6 +46,7 @@ class BasePipelineTask(ABC):
     incoming_queue: asyncio.Queue
     outgoing_queue: asyncio.Queue
     max_tasks_semaphore: asyncio.Semaphore
+    reference_tasks: list = []
 
     def __init__(self, incoming_queue: asyncio.Queue, outgoing_queue: asyncio.Queue, max_tasks: int = 20):
         self.incoming_queue = incoming_queue
@@ -92,8 +95,16 @@ class ProxyChecker:
         async with ProxyClient(proxy=self.proxy) as sess:
             try:
                 answer = await sess.get()
+            except asyncio.exceptions.TimeoutError as e:
+                logger.info(f'{self.proxy}: {self.__class__.__name__} - {e} :: {e.args}')
+            except (aiohttp.ClientProxyConnectionError, aiohttp.ServerConnectionError, aiohttp.ServerDisconnectedError,
+                    aiohttp.ServerTimeoutError) as e:
+                logger.info(f'client error {self.proxy}: {self.__class__.__name__} - {e} :: {e.args}')
             except Exception as e:
                 logger.info(f'{Proxy} -- {e}, -- {e.args}')
+                logger.exception(e)
+            finally:
+                self.proxy.date_update = datetime.datetime.utcnow()
         if not answer:
             self.proxy.is_alive = False
             return self.proxy
@@ -105,8 +116,7 @@ class ProxyChecker:
         return self.proxy
 
     def rebuild_proxy(self, answer: dict) -> None:
-        self.proxy.latency = float(round(answer['latency'], 2))
-        self.proxy.date_update = answer['date_update']
+        self.proxy.latency = answer['latency']
         self.proxy.is_alive = True
 
     def check_policy(self, data: dict) -> bool:
@@ -143,7 +153,7 @@ class TaskProxyCheckHandler(BaseTaskHandler):
                 logger.error(f'{proxy} -- not instance Proxy')
                 self.max_tasks_semaphore.release()
                 continue
-            create_task(self.processing_task(proxy))
+            self.reference_tasks.append(create_task(self.processing_task(proxy)))
             await asyncio.sleep(0)
 
     async def processing_task(self, proxy: Proxy) -> None:
@@ -235,6 +245,7 @@ class LocationTaskHandler(BasePipelineTask, BaseTaskHandler):
             proxy.location = location
         except Exception as e:
             logger.error(f"{e} :: {e.args}")
+            logger.exception(e)
 
         try:
             await self.put_proxy_to_queue(proxy=proxy)

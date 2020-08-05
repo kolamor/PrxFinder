@@ -30,11 +30,13 @@ def latency(coro):
 
 
 def date_update(coro):
-    """wrapper -  approximately time read response, adds latency to returned dict"""
+    """wrapper -  dateupdate"""
     async def wrapped(*args, **kwargs):
-        result = await coro(*args, **kwargs)
-        result.update({'date_update': datetime.datetime.utcnow()})
-        return result
+        try:
+            result = await coro(*args, **kwargs)
+        finally:
+            result.update({'date_update': datetime.datetime.utcnow()})
+            return result
     return wrapped
 
 
@@ -80,7 +82,7 @@ class ProxyClient:
 
 
     @latency
-    @date_update
+    # @date_update
     async def get(self, url: Optional[str] = None) -> dict:
         """ get request from url or self.test_url,
         context =  {'url': type[str],
@@ -124,7 +126,7 @@ class Location:
                  region_code: Optional[str] = None,
                  region_name: Optional[str] = None,
                  city: Optional[str] = None,
-                 zip_code: Union[str, int] = None,
+                 zip_code: Union[str] = None,
                  time_zone: Optional[str] = None,
                  latitude: Optional[float] = None,
                  longitude: Optional[float] = None,
@@ -136,7 +138,7 @@ class Location:
         self.region_code = region_code
         self.region_name = region_name
         self.city = city
-        self.zip_code = int(zip_code)
+        self.zip_code = zip_code
         self.time_zone = time_zone
         self.latitude = latitude
         self.longitude = longitude
