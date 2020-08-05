@@ -8,6 +8,7 @@ from typing import Optional, Type, Union
 # from .proxy import Proxy
 import logging
 import time
+import weakref
 try:
     from urllib2 import _parse_proxy
 except ImportError:
@@ -29,13 +30,19 @@ def latency(coro):
     return wrapped
 
 
-def date_update(coro):
-    """wrapper -  dateupdate"""
+def retry(coro):
+    """wrapper -  retry"""
     async def wrapped(*args, **kwargs):
-        try:
-            result = await coro(*args, **kwargs)
-        finally:
-            result.update({'date_update': datetime.datetime.utcnow()})
+        nretry = 3
+        result = {}
+        for n in range(nretry):
+            try:
+                result = await coro(*args, **kwargs)
+            except (aiohttp.ClientProxyConnectionError, aiohttp.ServerConnectionError, aiohttp.ServerDisconnectedError,
+                    aiohttp.ServerTimeoutError) as e:
+                logger.info(f'retry {args}, {kwargs} ::: -> {e}, {e.args}')
+                if n >= nretry - 1:
+                    raise
             return result
     return wrapped
 
@@ -77,25 +84,22 @@ class ProxyClient:
         await self._create_connector()
         return self
 
-    async def close(self) -> None:
-        await self._session.close()
-
-
+    @retry
     @latency
-    # @date_update
-    async def get(self, url: Optional[str] = None) -> dict:
+    async def get(self, url: Optional[str] = None, timeout: int = 180) -> dict:
         """ get request from url or self.test_url,
         context =  {'url': type[str],
                     'status_response': Type[str],
                     'headers': Type[CIMultiDictProxy],
                     'content: Type[byte],
                 }
+        :param timeout: int:
         :param url: str
         :return: context: dict
         """
         if not url:
             url = self.test_url
-        async with self._session.get(url=url) as response:
+        async with self._session.get(url=url, timeout=timeout) as response:
             context = {
                 'url': url,
                 'status_response': response.status,
@@ -106,6 +110,9 @@ class ProxyClient:
                 context.update({'content': content})
         return context
 
+    async def close(self) -> None:
+        await self._session.close()
+
     @property
     def closed(self) -> bool:
         return self._session.closed
@@ -113,6 +120,28 @@ class ProxyClient:
     async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException],
                         exc_tb: Optional[TracebackType]) -> None:
         await self.close()
+
+
+class ReferenceLocation:
+
+    @classmethod
+    def get(cls):
+        cls.__create_weak_set()
+        return cls.__references
+
+    @classmethod
+    def add(cls, ref: weakref.ReferenceType):
+        cls.__create_weak_set()
+        cls.__references.add(ref)
+
+    @classmethod
+    def __create_weak_set(cls):
+        if not getattr(cls, '__reference_list', None):
+            cls.__references = weakref.WeakSet()
+
+
+class ReferenceProxy(ReferenceLocation):
+    pass
 
 
 class Location:
@@ -143,6 +172,8 @@ class Location:
         self.latitude = latitude
         self.longitude = longitude
         self.metro_code = metro_code
+
+        ReferenceLocation.add(self)
 
     def as_dict(self, ignore_none: bool = False):
         """return attrs as dict from keys, ignore_none - delete items with None value """
@@ -186,6 +217,8 @@ class Proxy:
         self.date_creation = date_creation
         self.anonymous = anonymous
         self.in_process = in_process
+
+        ReferenceProxy.add(self)
 
     def _create_uri(self) -> str:
         host_port = f'{self.host}:{self.port}'

@@ -23,7 +23,7 @@ __all__ = ('ProxyChecker', 'TaskProxyCheckHandler', 'CheckProxyPolicy', 'BaseTas
 
 class BaseTaskHandler(ABC):
     _instance_start: Optional[asyncio.Task] = None
-    reference_tasks: list = []
+    reference_tasks: weakref.WeakSet = weakref.WeakSet()
 
     async def start(self) -> None:
         self._instance_start = create_task(self._start())
@@ -46,7 +46,7 @@ class BasePipelineTask(ABC):
     incoming_queue: asyncio.Queue
     outgoing_queue: asyncio.Queue
     max_tasks_semaphore: asyncio.Semaphore
-    reference_tasks: list = []
+    reference_tasks: weakref.WeakSet = weakref.WeakSet()
 
     def __init__(self, incoming_queue: asyncio.Queue, outgoing_queue: asyncio.Queue, max_tasks: int = 20):
         self.incoming_queue = incoming_queue
@@ -116,7 +116,7 @@ class ProxyChecker:
         return self.proxy
 
     def rebuild_proxy(self, answer: dict) -> None:
-        self.proxy.latency = answer['latency']
+        self.proxy.latency = float(round(answer['latency'], 3))
         self.proxy.is_alive = True
 
     def check_policy(self, data: dict) -> bool:
@@ -153,7 +153,7 @@ class TaskProxyCheckHandler(BaseTaskHandler):
                 logger.error(f'{proxy} -- not instance Proxy')
                 self.max_tasks_semaphore.release()
                 continue
-            self.reference_tasks.append(create_task(self.processing_task(proxy)))
+            self.reference_tasks.add(create_task(self.processing_task(proxy)))
             await asyncio.sleep(0)
 
     async def processing_task(self, proxy: Proxy) -> None:
