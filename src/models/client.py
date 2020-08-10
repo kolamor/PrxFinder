@@ -1,3 +1,4 @@
+import base64
 import aiohttp
 import asyncio
 from aiohttp_proxy import ProxyConnector, ProxyType
@@ -5,7 +6,6 @@ from aiohttp_proxy import ProxyConnector, ProxyType
 import datetime
 from types import TracebackType
 from typing import Optional, Type, Union, Any
-# from .proxy import Proxy
 import logging
 import time
 import weakref
@@ -64,6 +64,7 @@ class ProxyClient:
      """
     test_url: str = 'http://httpbin.org/status/200'
     return_content: bool = False
+    _session: aiohttp.ClientSession
 
     def __init__(self, proxy: 'Proxy', test_url: str = None):
         self.proxy = proxy
@@ -80,13 +81,13 @@ class ProxyClient:
         connector = ProxyConnector.from_url(self.proxy.url)
         self._session = aiohttp.ClientSession(connector=connector)
 
-    async def __aenter__(self, *args, **kwargs) -> 'ProxyClient':
+    async def __aenter__(self) -> 'ProxyClient':
         await self._create_connector()
         return self
 
     @retry
     @latency
-    async def get(self, url: Optional[str] = None, timeout: int = 180) -> dict:
+    async def get(self, url: Optional[str] = None, timeout: int = 90) -> dict:
         """ get request from url or self.test_url,
         context =  {'url': type[str],
                     'status_response': Type[str],
@@ -120,6 +121,8 @@ class ProxyClient:
     async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException],
                         exc_tb: Optional[TracebackType]) -> None:
         await self.close()
+        self.proxy = None
+        del self._session
 
 
 class ReferenceLocation:
@@ -246,8 +249,16 @@ class Proxy:
     def as_dict(self) -> dict:
         keys = ('host', 'port', 'login', 'password', 'latency', 'is_alive', 'scheme', 'date_update', 'date_creation',
                 'anonymous', 'in_process', )
-        context = {k: v for k, v in self.__dict__ .items() if k in keys}
+        context = {k: getattr(self, k) for k in keys}
         return context
+
+    @property
+    def user_pass_base64(self):
+        if self.login and self.password:
+            user_pass_base64 = base64.b64encode(f'{self.login}:{self.password}'.encode())
+        else:
+            user_pass_base64 = None
+        return user_pass_base64
 
     def __repr__(self):
         return str(self.as_dict())
