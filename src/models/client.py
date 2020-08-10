@@ -4,10 +4,11 @@ from aiohttp_proxy import ProxyConnector, ProxyType
 
 import datetime
 from types import TracebackType
-from typing import Optional, Type, Union
+from typing import Optional, Type, Union, Any
 # from .proxy import Proxy
 import logging
 import time
+import weakref
 try:
     from urllib2 import _parse_proxy
 except ImportError:
@@ -15,7 +16,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('ProxyClient', 'Proxy', 'Location')
+__all__ = ('ProxyClient', 'Proxy', 'Location', "ReferenceProxy", "ReferenceLocation", )
 
 
 def latency(coro):
@@ -29,12 +30,20 @@ def latency(coro):
     return wrapped
 
 
-def date_update(coro):
-    """wrapper -  approximately time read response, adds latency to returned dict"""
+def retry(coro):
+    """wrapper -  retry"""
     async def wrapped(*args, **kwargs):
-        result = await coro(*args, **kwargs)
-        result.update({'date_update': datetime.datetime.utcnow()})
-        return result
+        nretry = 3
+        result = {}
+        for n in range(nretry):
+            try:
+                result = await coro(*args, **kwargs)
+            except (aiohttp.ClientProxyConnectionError, aiohttp.ServerConnectionError, aiohttp.ServerDisconnectedError,
+                    aiohttp.ServerTimeoutError) as e:
+                logger.info(f'retry {args}, {kwargs} ::: -> {e}, {e.args}')
+                if n >= nretry - 1:
+                    raise
+            return result
     return wrapped
 
 
@@ -75,25 +84,22 @@ class ProxyClient:
         await self._create_connector()
         return self
 
-    async def close(self) -> None:
-        await self._session.close()
-
-
+    @retry
     @latency
-    @date_update
-    async def get(self, url: Optional[str] = None) -> dict:
+    async def get(self, url: Optional[str] = None, timeout: int = 180) -> dict:
         """ get request from url or self.test_url,
         context =  {'url': type[str],
                     'status_response': Type[str],
                     'headers': Type[CIMultiDictProxy],
                     'content: Type[byte],
                 }
+        :param timeout: int:
         :param url: str
         :return: context: dict
         """
         if not url:
             url = self.test_url
-        async with self._session.get(url=url) as response:
+        async with self._session.get(url=url, timeout=timeout) as response:
             context = {
                 'url': url,
                 'status_response': response.status,
@@ -104,6 +110,9 @@ class ProxyClient:
                 context.update({'content': content})
         return context
 
+    async def close(self) -> None:
+        await self._session.close()
+
     @property
     def closed(self) -> bool:
         return self._session.closed
@@ -111,6 +120,28 @@ class ProxyClient:
     async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException],
                         exc_tb: Optional[TracebackType]) -> None:
         await self.close()
+
+
+class ReferenceLocation:
+
+    @classmethod
+    def get(cls):
+        cls.__create_weak_set()
+        return cls._references
+
+    @classmethod
+    def add(cls, ref_obj: Any):
+        cls.__create_weak_set()
+        cls._references.add(ref_obj)
+
+    @classmethod
+    def __create_weak_set(cls):
+        if not getattr(cls, '_references', None):
+            cls._references = weakref.WeakSet()
+
+
+class ReferenceProxy(ReferenceLocation):
+    pass
 
 
 class Location:
@@ -124,7 +155,7 @@ class Location:
                  region_code: Optional[str] = None,
                  region_name: Optional[str] = None,
                  city: Optional[str] = None,
-                 zip_code: Union[str, int] = None,
+                 zip_code: Union[str] = None,
                  time_zone: Optional[str] = None,
                  latitude: Optional[float] = None,
                  longitude: Optional[float] = None,
@@ -136,11 +167,13 @@ class Location:
         self.region_code = region_code
         self.region_name = region_name
         self.city = city
-        self.zip_code = int(zip_code)
+        self.zip_code = zip_code
         self.time_zone = time_zone
         self.latitude = latitude
         self.longitude = longitude
         self.metro_code = metro_code
+
+        ReferenceLocation.add(self)
 
     def as_dict(self, ignore_none: bool = False):
         """return attrs as dict from keys, ignore_none - delete items with None value """
@@ -184,6 +217,8 @@ class Proxy:
         self.date_creation = date_creation
         self.anonymous = anonymous
         self.in_process = in_process
+
+        ReferenceProxy.add(self)
 
     def _create_uri(self) -> str:
         host_port = f'{self.host}:{self.port}'

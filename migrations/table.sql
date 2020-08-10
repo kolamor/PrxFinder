@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS location(
     time_zone VARCHAR,
     latitude FLOAT,
     longitude FLOAT,
-    zip_code INTEGER,
+    zip_code VARCHAR,
     metro_code INTEGER
 );
 

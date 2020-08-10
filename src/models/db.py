@@ -23,7 +23,7 @@ proxy_table = Table(
     Column('password', VARCHAR, nullable=True),
     Column('date_creation', DateTime(timezone=False)),
     Column('date_update', DateTime(timezone=False)),
-    Column('scheme', VARCHAR(6)),
+    Column('scheme', VARCHAR(6), nullable=True),
     Column('latency', Float, nullable=True),
     Column('is_alive', BOOLEAN, nullable=True),
     Column('anonymous', BOOLEAN, nullable=True),
@@ -43,6 +43,6 @@ location_table = Table(
     Column('latitude', Float, nullable=True),
     Column('longitude', Float, nullable=True),
     Column('metro_code', VARCHAR, nullable=True),
-    Column('zip_code', Integer, nullable=True),
+    Column('zip_code', VARCHAR, nullable=True),
     Column('region_name', VARCHAR, nullable=True)
 )

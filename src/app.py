@@ -4,6 +4,7 @@ import asyncio
 import logging
 from aiohttp import web, ClientSession, TCPConnector
 import src
+from .parse_module.free_proxy import Sslproxies24_top
 from .routes import setup_routes
 
 logger = logging.getLogger(__name__)
@@ -32,11 +33,37 @@ async def on_start(app):
 
 
 async def on_shutdown(app):
+
     logger.info('on_shutdown')
+    await shutdown_proxy_in_process(app)
     await app['asyncpgsa_db_pool'].close()
     logger.info('PSQL closed')
     await app['http_client'].close()
     logger.info('http_client closed')
+
+
+async def shutdown_proxy_in_process(app):  # TODO need full update in process
+    start_proxy_handler: src.StartProxyHandler = app['start_proxy_handler']
+    start_proxy_handler.pause()
+    # create hard refs
+    refs = set(src.ReferenceProxy.get())
+    proxy_db: src.ProxyDb = app['ProxyDb']
+    tasks = []
+    for proxy in refs:
+        try:
+            logger.debug(f"replace in process false {proxy}  of {len(src.ReferenceProxy.get())}")
+            context = {
+                "host": proxy.host,
+                "port": proxy.port,
+                "in_process": False
+            }
+            task = asyncio.ensure_future( proxy_db.update_proxy_pm(**context))
+            tasks.append(task)
+        except Exception as e:
+            logger.info(f"Shutdown Proxy, :: {e}, {e.args}")
+    res = await asyncio.gather(*tasks, return_exceptions=True)
+    start_proxy_handler.stop()
+    logger.info(f'STOP {start_proxy_handler.__class__.__name__}')
 
 
 def create_tcp_connector(config: dict) -> TCPConnector:
@@ -63,7 +90,7 @@ async def start_check_proxy(app: aiohttp.web.Application, config: dict):
 
 async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: dict):
     db = app['asyncpgsa_db_pool']
-    proxy_db = src.ProxyDb(db_connect=db, table_proxy=src.proxy_table)
+    proxy_db = app['ProxyDb'] = src.ProxyDb(db_connect=db, table_proxy=src.proxy_table)
     queue_api_to_db = app['queue_api_to_db'] = asyncio.Queue()
     task_handler_api_to_db = app['task_handler_api_to_db'] = src.TaskHandlerToDB(incoming_queue=queue_api_to_db,
                                                                                  proxy_db=proxy_db)
@@ -77,7 +104,7 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
     checker_out_queue = app['checker_out_queue'] = asyncio.Queue()
     checker_handler = app['checker_handler'] = src.TaskProxyCheckHandler(incoming_queue=start_proxy_queue,
                                                                          outgoing_queue=checker_out_queue,
-                                                                         max_tasks=20)
+                                                                         max_tasks=100)
     await checker_handler.start()
 
     api_location = src.ApiLocation(app['http_client'])
@@ -87,6 +114,11 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
                                                                          incoming_queue=checker_out_queue,
                                                                          outgoing_queue=queue_api_to_db, max_tasks=20)
     await location_handler.start()
+
+    #  start parse
+
+    ssl_proxies = Sslproxies24_top(client_session=app['http_client'], out_queue=queue_api_to_db)
+    await ssl_proxies.parse()
 
 
 
