@@ -1,5 +1,5 @@
 from aiohttp.web import View, json_response
-from ..models import Proxy
+from ..models import Proxy, ReferenceLocation, ReferenceProxy
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,3 +30,13 @@ class ProxyHandler(View):
         for prx in proxys:
             await self.request.app['queue_api_to_db'].put(prx)
         return json_response(status=200, data={'status': 'put to processing'})
+
+
+class StatsHandler(View):
+
+    async def get(self):
+        context = {
+            "Proxy": len(ReferenceProxy.get()),
+            "Location": len(ReferenceLocation.get())
+        }
+        return json_response(status=200, data=context, )

@@ -104,10 +104,12 @@ class ProxyDb:
         return res
 
     async def update_proxy_pm(self, **kwargs):
+        host = kwargs.pop('host')
+        port = kwargs.pop('port')
         async with self._db.acquire() as conn:
             query = update(self.table_proxy).where(and_(
-                self.table_proxy.c.host == kwargs['host'],
-                self.table_proxy.c.port == kwargs['port']
+                self.table_proxy.c.host == host,
+                self.table_proxy.c.port == port
             )).values(**kwargs)
             res = await conn.execute(query)
         return res
@@ -203,16 +205,22 @@ class StartProxyHandler(TaskHandlerToDB):
     proxy_db: ProxyDb
     outgoing_queue: asyncio.Queue
     max_tasks_semaphore: asyncio.Semaphore
+    works = asyncio.Event()
 
     def __init__(self, outgoing_queue: asyncio.Queue, proxy_db: ProxyDb, max_tasks: int = 20):
         self.proxy_db = proxy_db
         self.outgoing_queue = outgoing_queue
         self.max_tasks_semaphore = asyncio.Semaphore(max_tasks)
 
+    def pause(self):
+        self.works.clear()
+
     async def _start(self) -> None:
         logger.info(f'{self.__class__.__name__} starting')
+        self.works.set()
         while True:
             try:
+                await self.works.wait()
                 proxy = await self.get_proxy()
                 if not proxy:
                     await asyncio.sleep(1)

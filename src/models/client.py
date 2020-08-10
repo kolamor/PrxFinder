@@ -4,7 +4,7 @@ from aiohttp_proxy import ProxyConnector, ProxyType
 
 import datetime
 from types import TracebackType
-from typing import Optional, Type, Union
+from typing import Optional, Type, Union, Any
 # from .proxy import Proxy
 import logging
 import time
@@ -16,7 +16,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('ProxyClient', 'Proxy', 'Location')
+__all__ = ('ProxyClient', 'Proxy', 'Location', "ReferenceProxy", "ReferenceLocation", )
 
 
 def latency(coro):
@@ -127,17 +127,17 @@ class ReferenceLocation:
     @classmethod
     def get(cls):
         cls.__create_weak_set()
-        return cls.__references
+        return cls._references
 
     @classmethod
-    def add(cls, ref: weakref.ReferenceType):
+    def add(cls, ref_obj: Any):
         cls.__create_weak_set()
-        cls.__references.add(ref)
+        cls._references.add(ref_obj)
 
     @classmethod
     def __create_weak_set(cls):
-        if not getattr(cls, '__reference_list', None):
-            cls.__references = weakref.WeakSet()
+        if not getattr(cls, '_references', None):
+            cls._references = weakref.WeakSet()
 
 
 class ReferenceProxy(ReferenceLocation):
