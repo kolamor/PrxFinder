@@ -5,7 +5,7 @@ import datetime
 from typing import Optional
 # from .checker import BaseTaskHandler
 from .db import proxy_table, location_table
-from sqlalchemy import Table, select, update, and_, or_, delete, exists, text
+from sqlalchemy import Table, select, update, and_, or_, delete, exists, text, asc
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects import postgresql
 import sys
@@ -145,6 +145,17 @@ class ProxyDb:
                     ).values({"in_process": True})
                     update_result = await conn.execute(query_update)
                     return res
+        return res
+
+    async def get_good_proxy(self, limit: int = 10, schema: str = None):
+        """select * from proxy where is_alive = true order by  latency asc;"""
+
+        async with self._db.acquire() as conn:
+            query = select([self.table_proxy]).where(self.table_proxy.c.is_alive == True)
+            if schema:
+                query = query.where(self.table_proxy.c.schema == schema)
+            query = query.order_by(asc(self.table_proxy.c.latency)).limit(limit)
+            res = await conn.fetch(query)
         return res
 
 

@@ -29,7 +29,9 @@ async def on_start(app):
     app['asyncpgsa_db_pool'] = await asyncpgsa.create_pool(dsn=config['POSTGRESQL_URI'], **db_connect_kwargs)
     app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
-    await start_check_proxy(app=app, config=config)
+    # await start_check_proxy(app=app, config=config)
+    asyncio.ensure_future(src.start_prx_serve(app))
+
 
 
 async def on_shutdown(app):
@@ -117,8 +119,8 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
 
     #  start parse
 
-    ssl_proxies = Sslproxies24_top(client_session=app['http_client'], out_queue=queue_api_to_db)
-    await ssl_proxies.parse()
+    # ssl_proxies = Sslproxies24_top(client_session=app['http_client'], out_queue=queue_api_to_db)
+    # await ssl_proxies.parse()
 
 
 

@@ -1,10 +1,19 @@
 import asyncio
 from asyncio import StreamReader, StreamWriter
-from .prx_stream import Proxy, ProxyFactory
+from .prx_stream import Proxy
 from .prx_stream import ProxyClient
 import logging
 
 logger = logging.getLogger(__file__)
+
+
+class ProxyFactory:
+
+    def __init__(self):
+        pass
+
+    def get_proxy(self):
+        pass
 
 
 class ServerReader:
@@ -63,12 +72,12 @@ class Synchronizer:
         start_row = self.server_connect.start_row
         print(start_row)
         await self.client_connect.create_proxy_connect(start_row)
-        task_server = asyncio.create_task(self.away(self.server_connect, self.client_connect))
-        task_client = asyncio.create_task(self.away(self.client_connect, self.server_connect))
+        task_server = asyncio.create_task(self.rw_stream(self.server_connect, self.client_connect))
+        task_client = asyncio.create_task(self.rw_stream(self.client_connect, self.server_connect))
         await asyncio.gather(task_server, task_client)
         logger.debug('disconect')
 
-    async def away(self, reader, writer):
+    async def rw_stream(self, reader, writer):
         try:
             while not reader.reader_at_of():
                 chunk = await reader.read()
@@ -82,13 +91,14 @@ class Synchronizer:
         finally:
             pass
 
+
 async def handler(reader: StreamReader, writer: StreamWriter):
     server_connect = await ServerReader.init(reader=reader, writer=writer)
     synchronizer = await Synchronizer.init(server_connect=server_connect)
     await synchronizer.start()
 
 
-async def start():
+async def start_prx_serve(app):
     print('start')
     try:
         srv = await asyncio.start_server(handler, host='0.0.0.0', port=5555, )

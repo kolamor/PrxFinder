@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 import datetime
-from typing import Optional, Union, Type
+from typing import Optional, Union
 from .errors import ManyRequestAtHourLocationApi
 from .client import ProxyClient, Proxy, Location
 from .db_work import LocationDb
