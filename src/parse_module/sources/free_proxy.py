@@ -6,8 +6,8 @@ import sys
 from lxml import etree
 from io import StringIO
 # from .utils import HEADERS
-from .utils import IPPattern, IPPortPatternLine
-from ..models.client import Proxy
+from src.parse_module.utils import IPPattern, IPPortPatternLine
+from src.models.client import Proxy
 import zipfile
 import re
 if sys.version_info < (3, 7)[:2]:
@@ -15,7 +15,7 @@ if sys.version_info < (3, 7)[:2]:
 else:
     from asyncio import create_task
 
-
+__all__ = ('Sslproxies24_top', )
 
 HEADERS = {
     # 'Host': 'workupload.com',

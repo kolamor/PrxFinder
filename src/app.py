@@ -1,10 +1,12 @@
+import functools
+
 import asyncpgsa
 import aiohttp
 import asyncio
 import logging
 from aiohttp import web, ClientSession, TCPConnector
 import src
-from .parse_module.free_proxy import Sslproxies24_top
+import src.parse_module.sources as sources
 from .routes import setup_routes
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,7 @@ async def on_start(app):
     app['asyncpgsa_db_pool'] = await asyncpgsa.create_pool(dsn=config['POSTGRESQL_URI'], **db_connect_kwargs)
     app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
-    # await start_check_proxy(app=app, config=config)
+    await start_check_proxy(app=app, config=config)
     asyncio.ensure_future(src.start_prx_serve(app))
 
 
@@ -45,11 +47,15 @@ async def on_shutdown(app):
 
 
 async def shutdown_proxy_in_process(app):  # TODO need full update in process
-    start_proxy_handler: src.StartProxyHandler = app['start_proxy_handler']
-    start_proxy_handler.pause()
-    # create hard refs
-    refs = set(src.ReferenceProxy.get())
-    proxy_db: src.ProxyDb = app['ProxyDb']
+    try:
+        start_proxy_handler: src.StartProxyHandler = app['start_proxy_handler']
+        start_proxy_handler.pause()
+        # create hard refs
+        refs = set(src.ReferenceProxy.get())
+        proxy_db: src.ProxyDb = app['ProxyDb']
+    except Exception as e:
+        logger.error(f'shutdown error {e}, {e.args}')
+        refs = []
     tasks = []
     for proxy in refs:
         try:
@@ -70,9 +76,6 @@ async def shutdown_proxy_in_process(app):  # TODO need full update in process
 
 def create_tcp_connector(config: dict) -> TCPConnector:
     """
-    :param config: dict
-
-    :return: TCPConnector
     """
     connector = TCPConnector(
         limit_per_host=config.get('TCP_limit_per_host', 100),
@@ -119,8 +122,25 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
 
     #  start parse
 
-    # ssl_proxies = Sslproxies24_top(client_session=app['http_client'], out_queue=queue_api_to_db)
-    # await ssl_proxies.parse()
+    await parse_sources(app=app, config=config, queue=queue_api_to_db)
+
+
+async def parse_sources(app: aiohttp.web.Application, config: dict, queue: asyncio.Queue):
+    """start parse sources
+        queue - income(api to db)
+    """
+
+    for source in config['PARSE_SOURCES']:
+        cls_source = getattr(sources, source)
+        obj = cls_source(client_session=app['http_client'], out_queue=queue)
+        print(f'start parse {cls_source}')
+        asyncio.create_task(obj.parse()).add_done_callback(functools.partial(callback_parse, cls_source.__name__))
+
+
+def callback_parse(*args, **kwargs):
+    resource, task = args
+    coro = task.get_coro()
+    logger.debug(f'{resource} :: {task}')
 
 
 
