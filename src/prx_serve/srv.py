@@ -12,7 +12,8 @@ class ProxyFactory:
     def __init__(self):
         pass
 
-    def get_proxy(self):
+    @classmethod
+    def get_proxy(cls) -> Proxy:
         pass
 
 
@@ -52,19 +53,20 @@ class ServerReader:
 
 
 class Synchronizer:
-    def __init__(self, server_connect: ServerReader, client_connect: ProxyClient):
+    def __init__(self, server_connect: ServerReader, client_connect: ProxyClient, proxy: Proxy):
+        self.proxy = proxy
         self.server_connect = server_connect
         self.client_connect = client_connect
 
     @classmethod
-    async def init(cls, server_connect: ServerReader) -> 'Synchronizer':
-        client_connect = await cls._create_client_connect()
-        self = cls(server_connect=server_connect, client_connect=client_connect)
+    async def init(cls, server_connect: ServerReader, proxy: Proxy) -> 'Synchronizer':
+        client_connect = await cls._create_client_connect(proxy)
+        self = cls(server_connect=server_connect, client_connect=client_connect, proxy=proxy)
         return self
 
     @classmethod
-    async def _create_client_connect(cls) -> ProxyClient:
-        proxy = ProxyFactory.get_proxy()
+    async def _create_client_connect(cls, proxy) -> ProxyClient:
+        # proxy: Proxy = ProxyFactory.get_proxy()
         client_connect = await ProxyClient.init(proxy=proxy)
         return client_connect
 
@@ -94,11 +96,12 @@ class Synchronizer:
 
 async def handler(reader: StreamReader, writer: StreamWriter):
     server_connect = await ServerReader.init(reader=reader, writer=writer)
+    proxy = ProxyFactory.get_proxy()
     synchronizer = await Synchronizer.init(server_connect=server_connect)
     await synchronizer.start()
 
 
-async def start_prx_serve(app):
+async def start_prx_serve(config: dict):
     print('start')
     try:
         srv = await asyncio.start_server(handler, host='0.0.0.0', port=5555, )
