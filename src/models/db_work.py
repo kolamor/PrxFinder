@@ -1,5 +1,6 @@
 import asyncio
 import asyncpg
+import asyncpgsa
 import logging
 import datetime
 from typing import Optional
@@ -8,6 +9,7 @@ from .db import proxy_table, location_table
 from sqlalchemy import Table, select, update, and_, or_, delete, exists, text, asc
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects import postgresql
+
 import sys
 from . import Proxy
 if sys.version_info < (3, 7)[:2]:
@@ -20,8 +22,34 @@ logger = logging.getLogger(__name__)
 __all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', 'StartProxyHandler')
 
 
+class NoSetDbConnect(Exception):
+    pass
+
+
+class DbConnect:
+    _dns: str
+    _db_connect_kwargs: dict
+    pool: asyncpg.pool.Pool
+
+    @classmethod
+    async def create_connect(cls, dns: str, db_connect_kwargs: dict) -> None:
+        cls._dns = dns
+        cls._db_connect_kwargs = db_connect_kwargs
+        cls.pool = await asyncpgsa.create_pool(dsn=dns, **db_connect_kwargs)
+
+    @classmethod
+    def set_connect(cls, pool: asyncpg.pool.Pool) -> None:
+        cls.pool = pool
+
+    def __get__(self, instance, owner):
+        conn = self.__class__.pool
+        if not conn:
+            raise NoSetDbConnect(f'{self.__class__} don\'t set db connect')
+        return conn
+
+
 class LocationDb:
-    _db: asyncpg.pool.Pool
+    _db: asyncpg.pool.Pool = DbConnect()
     table_location: Table = location_table
 
     def __init__(self, db_connect: asyncpg.pool.Pool, table_location: Optional[Table] = None):
