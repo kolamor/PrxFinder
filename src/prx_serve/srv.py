@@ -2,19 +2,11 @@ import asyncio
 from asyncio import StreamReader, StreamWriter
 from .prx_stream import Proxy
 from .prx_stream import ProxyClient
+from  ..models.proxy_factory import ProxyFactoryDb
 import logging
 
+
 logger = logging.getLogger(__file__)
-
-
-class ProxyFactory:
-
-    def __init__(self):
-        pass
-
-    @classmethod
-    def get_proxy(cls) -> Proxy:
-        pass
 
 
 class ServerReader:
@@ -72,7 +64,7 @@ class Synchronizer:
 
     async def start(self):
         start_row = self.server_connect.start_row
-        print(start_row)
+        # print(start_row)
         await self.client_connect.create_proxy_connect(start_row)
         task_server = asyncio.create_task(self.rw_stream(self.server_connect, self.client_connect))
         task_client = asyncio.create_task(self.rw_stream(self.client_connect, self.server_connect))
@@ -96,15 +88,17 @@ class Synchronizer:
 
 async def handler(reader: StreamReader, writer: StreamWriter):
     server_connect = await ServerReader.init(reader=reader, writer=writer)
-    proxy = ProxyFactory.get_proxy()
-    synchronizer = await Synchronizer.init(server_connect=server_connect)
+    factory = ProxyFactoryDb()
+    proxy = await factory.get_random_alive_proxy()
+    print('start connect:', proxy)
+    synchronizer = await Synchronizer.init(server_connect=server_connect, proxy=proxy)
     await synchronizer.start()
 
 
-async def start_prx_serve(config: dict):
-    print('start')
+async def start_prx_serve(host: str, port: int):
+    print('start ')
     try:
-        srv = await asyncio.start_server(handler, host='0.0.0.0', port=5555, )
+        srv = await asyncio.start_server(handler, host=host, port=port)
         await srv.serve_forever()
     finally:
         # await srv.wait_closed()

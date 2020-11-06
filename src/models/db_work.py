@@ -174,16 +174,16 @@ class ProxyDb:
                     return res
         return res
 
-    async def get_good_proxy(self, limit: int = 10, schema: str = None):
-        """select * from proxy where is_alive = true order by  latency asc;"""
-
-        async with self._db.acquire() as conn:
-            query = select([self.table_proxy]).where(self.table_proxy.c.is_alive == True) # noqa
-            if schema:
-                query = query.where(self.table_proxy.c.schema == schema)
-            query = query.order_by(asc(self.table_proxy.c.latency)).limit(limit)
-            res = await conn.fetch(query)
-        return res
+    # async def get_good_proxy(self, limit: int = 10, schema: str = None):
+    #     """select * from proxy where is_alive = true order by  latency asc;"""
+    #
+    #     async with self._db.acquire() as conn:
+    #         query = select([self.table_proxy]).where(self.table_proxy.c.is_alive == True) # noqa
+    #         if schema:
+    #             query = query.where(self.table_proxy.c.schema == schema)
+    #         query = query.order_by(asc(self.table_proxy.c.latency)).limit(limit)
+    #         res = await conn.fetch(query)
+    #     return res
 
 
 class TaskHandlerToDB:

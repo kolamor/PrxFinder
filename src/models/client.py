@@ -40,7 +40,7 @@ def retry(coro):
                 result = await coro(*args, **kwargs)
             except (aiohttp.ClientProxyConnectionError, aiohttp.ServerConnectionError, aiohttp.ServerDisconnectedError,
                     aiohttp.ServerTimeoutError) as e:
-                logger.info(f'retry {args}, {kwargs} ::: -> {e}, {e.args}')
+                logger.debug(f'retry {args}, {kwargs} ::: -> {e}, {e.args}')
                 if n >= nretry - 1:
                     raise
             return result

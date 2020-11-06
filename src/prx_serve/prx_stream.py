@@ -6,8 +6,8 @@ from typing import Optional
 
 class Client:
     def __init__(self, host: str, port: int, reader: StreamReader, writer: StreamWriter):
-        self._reader = reader
-        self._writer = writer
+        self._reader: StreamReader = reader
+        self._writer: StreamWriter = writer
         self._host = host
         self._port: int = port
         self.read_timeout: int = 10
@@ -22,7 +22,7 @@ class Client:
         :param port :type int
         :return: Client
         """
-        reader, writer = await cls._open_connection(host=host, port=port)
+        reader, writer = await cls._open_connection(host=str(host), port=port)
         self = cls(host=host, port=port, reader=reader, writer=writer)
         return self
 
@@ -49,7 +49,7 @@ class Client:
 
 class ProxyClient:
     def __init__(self, client: Client, proxy: 'Proxy'):
-        self.client = client  # type: Client
+        self.client = client
         self._proxy = proxy
 
     @classmethod

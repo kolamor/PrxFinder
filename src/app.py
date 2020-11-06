@@ -33,7 +33,7 @@ async def on_start(app):
     app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     await start_check_proxy(app=app, config=config)
-    asyncio.ensure_future(src.start_prx_serve(app))
+    asyncio.ensure_future(src.start_prx_serve(host='0.0.0.0', port= 5555))
 
 
 
@@ -121,8 +121,8 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
     await location_handler.start()
 
     #  start parse
-
-    await parse_sources(app=app, config=config, queue=queue_api_to_db)
+    if config['PARSE_PROXY']:
+        await parse_sources(app=app, config=config, queue=queue_api_to_db)
 
 
 async def parse_sources(app: aiohttp.web.Application, config: dict, queue: asyncio.Queue):
