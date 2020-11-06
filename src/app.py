@@ -7,6 +7,7 @@ from aiohttp import web, ClientSession, TCPConnector
 import src
 import src.parse_module.sources as sources
 from .routes import setup_routes
+from .models.db_work import DbConnectPool
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,8 @@ async def on_start(app):
     tcp_config = {}
     app['http_client'] = ClientSession(connector=create_tcp_connector(tcp_config))
     db_connect_kwargs = {}
-    app['asyncpgsa_db_pool'] = await asyncpgsa.create_pool(dsn=config['POSTGRESQL_URI'], **db_connect_kwargs)
+    await DbConnectPool.create_connect(dsn=config['POSTGRESQL_URI'], db_connect_kwargs=db_connect_kwargs)
+    app['asyncpgsa_db_pool'] = DbConnectPool.pool
     app['in_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     app['out_checker_queue'] = asyncio.Queue(config.get('limit_checker_queues', 0))
     await start_check_proxy(app=app, config=config)
@@ -64,7 +66,7 @@ async def shutdown_proxy_in_process(app):  # TODO need full update in process
                 "port": proxy.port,
                 "in_process": False
             }
-            task = asyncio.ensure_future( proxy_db.update_proxy_pm(**context))
+            task = asyncio.ensure_future(proxy_db.update_proxy_pm(**context))
             tasks.append(task)
         except Exception as e:
             logger.info(f"Shutdown Proxy, :: {e}, {e.args}")
@@ -93,8 +95,7 @@ async def start_check_proxy(app: aiohttp.web.Application, config: dict):
 
 
 async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: dict):
-    db = app['asyncpgsa_db_pool']
-    proxy_db = app['ProxyDb'] = src.ProxyDb(db_connect=db, table_proxy=src.proxy_table)
+    proxy_db = app['ProxyDb'] = src.ProxyDb(table_proxy=src.proxy_table)
     queue_api_to_db = app['queue_api_to_db'] = asyncio.Queue()
     task_handler_api_to_db = app['task_handler_api_to_db'] = src.TaskHandlerToDB(incoming_queue=queue_api_to_db,
                                                                                  proxy_db=proxy_db)
@@ -112,7 +113,7 @@ async def create_task_handlers_api_to_db(app: aiohttp.web.Application, config: d
     await checker_handler.start()
 
     api_location = src.ApiLocation(app['http_client'])
-    location_db = src.LocationDb(db_connect=db, table_location=src.location_table)
+    location_db = src.LocationDb(table_location=src.location_table)
     location_handler = app['location_handler'] = src.LocationTaskHandler(api_location=api_location,
                                                                          location_db=location_db,
                                                                          incoming_queue=checker_out_queue,

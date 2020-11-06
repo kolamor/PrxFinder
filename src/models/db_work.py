@@ -19,29 +19,30 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', 'StartProxyHandler')
+__all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', 'StartProxyHandler', 'DbConnectPool')
 
 
 class NoSetDbConnect(Exception):
     pass
 
 
-class DbConnect:
-    _dns: str
+class DbConnectPool:
+    """Descriptor db connect"""
+    _dsn: str
     _db_connect_kwargs: dict
     pool: asyncpg.pool.Pool
 
     @classmethod
-    async def create_connect(cls, dns: str, db_connect_kwargs: dict) -> None:
-        cls._dns = dns
+    async def create_connect(cls, dsn: str, db_connect_kwargs: dict) -> None:
+        cls._dsn = dsn
         cls._db_connect_kwargs = db_connect_kwargs
-        cls.pool = await asyncpgsa.create_pool(dsn=dns, **db_connect_kwargs)
+        cls.pool = await asyncpgsa.create_pool(dsn=dsn, **db_connect_kwargs)
 
     @classmethod
     def set_connect(cls, pool: asyncpg.pool.Pool) -> None:
         cls.pool = pool
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance, owner) -> asyncpg.pool.Pool:
         conn = self.__class__.pool
         if not conn:
             raise NoSetDbConnect(f'{self.__class__} don\'t set db connect')
@@ -49,13 +50,12 @@ class DbConnect:
 
 
 class LocationDb:
-    _db: asyncpg.pool.Pool = DbConnect()
+    _db: asyncpg.pool.Pool = DbConnectPool()
     table_location: Table = location_table
 
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_location: Optional[Table] = None):
+    def __init__(self, table_location: Optional[Table] = None):
         if table_location is not None:
             self.table_location = table_location
-        self._db = db_connect
 
     async def insert_location(self, **kwargs):
         async with self._db.acquire() as conn:
@@ -88,13 +88,12 @@ class LocationDb:
 
 
 class ProxyDb:
-    _db: asyncpg.pool.Pool
+    _db: asyncpg.pool.Pool = DbConnectPool()
     table_proxy: Table = location_table
     delta_minutes_for_check: int
 
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Optional[Table] = None,
+    def __init__(self, table_proxy: Optional[Table] = None,
                  delta_minutes_for_check: int = 60):
-        self._db = db_connect
         if table_proxy is not None:
             self.table_proxy = table_proxy
         self.delta_minutes_for_check = delta_minutes_for_check
