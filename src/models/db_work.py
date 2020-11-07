@@ -1,13 +1,15 @@
 import asyncio
 import asyncpg
+import asyncpgsa
 import logging
 import datetime
 from typing import Optional
 # from .checker import BaseTaskHandler
 from .db import proxy_table, location_table
-from sqlalchemy import Table, select, update, and_, or_, delete, exists, text
+from sqlalchemy import Table, select, update, and_, or_, delete, exists, text, asc
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects import postgresql
+
 import sys
 from . import Proxy
 if sys.version_info < (3, 7)[:2]:
@@ -17,17 +19,43 @@ else:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', 'StartProxyHandler')
+__all__ = ("TaskHandlerToDB", 'ProxyDb', 'LocationDb', 'StartProxyHandler', 'DbConnectPool')
+
+
+class NoSetDbConnect(Exception):
+    pass
+
+
+class DbConnectPool:
+    """Descriptor db connect"""
+    _dsn: str
+    _db_connect_kwargs: dict
+    pool: asyncpg.pool.Pool
+
+    @classmethod
+    async def create_connect(cls, dsn: str, db_connect_kwargs: dict) -> None:
+        cls._dsn = dsn
+        cls._db_connect_kwargs = db_connect_kwargs
+        cls.pool = await asyncpgsa.create_pool(dsn=dsn, **db_connect_kwargs)
+
+    @classmethod
+    def set_connect(cls, pool: asyncpg.pool.Pool) -> None:
+        cls.pool = pool
+
+    def __get__(self, instance, owner) -> asyncpg.pool.Pool:
+        conn = self.__class__.pool
+        if not conn:
+            raise NoSetDbConnect(f'{self.__class__} don\'t set db connect')
+        return conn
 
 
 class LocationDb:
-    _db: asyncpg.pool.Pool
+    _db: asyncpg.pool.Pool = DbConnectPool()
     table_location: Table = location_table
 
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_location: Optional[Table] = None):
+    def __init__(self, table_location: Optional[Table] = None):
         if table_location is not None:
             self.table_location = table_location
-        self._db = db_connect
 
     async def insert_location(self, **kwargs):
         async with self._db.acquire() as conn:
@@ -60,13 +88,12 @@ class LocationDb:
 
 
 class ProxyDb:
-    _db: asyncpg.pool.Pool
+    _db: asyncpg.pool.Pool = DbConnectPool()
     table_proxy: Table = location_table
     delta_minutes_for_check: int
 
-    def __init__(self, db_connect: asyncpg.pool.Pool, table_proxy: Optional[Table] = None,
+    def __init__(self, table_proxy: Optional[Table] = None,
                  delta_minutes_for_check: int = 60):
-        self._db = db_connect
         if table_proxy is not None:
             self.table_proxy = table_proxy
         self.delta_minutes_for_check = delta_minutes_for_check
@@ -146,6 +173,17 @@ class ProxyDb:
                     update_result = await conn.execute(query_update)
                     return res
         return res
+
+    # async def get_good_proxy(self, limit: int = 10, schema: str = None):
+    #     """select * from proxy where is_alive = true order by  latency asc;"""
+    #
+    #     async with self._db.acquire() as conn:
+    #         query = select([self.table_proxy]).where(self.table_proxy.c.is_alive == True) # noqa
+    #         if schema:
+    #             query = query.where(self.table_proxy.c.schema == schema)
+    #         query = query.order_by(asc(self.table_proxy.c.latency)).limit(limit)
+    #         res = await conn.fetch(query)
+    #     return res
 
 
 class TaskHandlerToDB:
@@ -247,3 +285,5 @@ class StartProxyHandler(TaskHandlerToDB):
             return
         proxy = Proxy(**{k: v for k, v in row.items()})
         return proxy
+
+

@@ -1,4 +1,13 @@
 # Default configuration file
+
 test: test
 LOGGING_LEVEL: INFO
+
 POSTGRESQL_URI: postgresql://user:pass@localhost:5432/test
+PARSE_PROXY: False
+
+# Proxy server
+START_PROXY_SERVER: TRUE
+
+PARSE_SOURCES:
+  - 'Sslproxies24_top'

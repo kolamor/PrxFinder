@@ -2,13 +2,13 @@ import asyncio
 import logging
 import sys
 import datetime
-from typing import Optional, Union, Type
-import weakref
+from typing import Optional, Union
 from .errors import ManyRequestAtHourLocationApi
 from .client import ProxyClient, Proxy, Location
 from .db_work import LocationDb
 from abc import ABC, abstractmethod
 import aiohttp
+import weakref
 
 if sys.version_info < (3, 7)[:2]:
     from asyncio import ensure_future as create_task
@@ -75,7 +75,6 @@ class BasePipelineTask(ABC):
         pass
 
 
-
 class ProxyChecker:
     """Check proxy"""
 
@@ -88,6 +87,7 @@ class ProxyChecker:
         """shortcut"""
         self = cls(proxy=proxy)
         proxy = await self.check_proxy()
+        del self
         return proxy
 
     async def check_proxy(self) -> Proxy:
@@ -96,17 +96,18 @@ class ProxyChecker:
             try:
                 answer = await sess.get()
             except asyncio.exceptions.TimeoutError as e:
-                logger.info(f'{self.proxy}: {self.__class__.__name__} - {e} :: {e.args}')
+                logger.debug(f'{self.proxy}: {self.__class__.__name__} - {e} :: {e.args}')
             except (aiohttp.ClientProxyConnectionError, aiohttp.ServerConnectionError, aiohttp.ServerDisconnectedError,
                     aiohttp.ServerTimeoutError) as e:
-                logger.info(f'client error {self.proxy}: {self.__class__.__name__} - {e} :: {e.args}')
+                logger.debug(f'client error {self.proxy}: {self.__class__.__name__} - {e} :: {e.args}')
             except Exception as e:
-                logger.info(f'{Proxy} -- {e}, -- {e.args}')
+                logger.info(f'{self.__class__.__name__} -- {Proxy} -- {e}, -- {e.args}')
                 logger.exception(e)
             finally:
                 self.proxy.date_update = datetime.datetime.utcnow()
         if not answer:
             self.proxy.is_alive = False
+            self.proxy.latency = None
             return self.proxy
         is_valid = self.check_policy(answer)
         if is_valid:
