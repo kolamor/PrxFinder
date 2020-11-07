@@ -107,6 +107,7 @@ class ProxyChecker:
                 self.proxy.date_update = datetime.datetime.utcnow()
         if not answer:
             self.proxy.is_alive = False
+            self.proxy.latency = None
             return self.proxy
         is_valid = self.check_policy(answer)
         if is_valid:
